@@ -1,5 +1,4 @@
-import { isDyadProEnabled, type LargeLanguageModel } from "@/lib/schemas";
-import { Button } from "@/components/ui/button";
+import { type LargeLanguageModel } from "@/lib/schemas";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,20 +15,16 @@ import { useLocalModels } from "@/hooks/useLocalModels";
 import { useLocalLMSModels } from "@/hooks/useLMStudioModels";
 import { useLanguageModelsByProviders } from "@/hooks/useLanguageModelsByProviders";
 
-import { ipc, LocalModel } from "@/ipc/types";
+import { LocalModel } from "@/ipc/types";
 import { useLanguageModelProviders } from "@/hooks/useLanguageModelProviders";
 import { useSettings } from "@/hooks/useSettings";
 import { PriceBadge } from "@/components/PriceBadge";
-import { TURBO_MODELS } from "@/ipc/shared/language_model_constants";
-import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/queryKeys";
-import { useTrialModelRestriction } from "@/hooks/useTrialModelRestriction";
 
 export function ModelPicker() {
   const { settings, updateSettings } = useSettings();
   const queryClient = useQueryClient();
-  const { isTrial } = useTrialModelRestriction();
   const onModelSelect = (model: LargeLanguageModel) => {
     updateSettings({ selectedModel: model });
     // Invalidate token count when model changes since different models have different context windows
@@ -109,28 +104,6 @@ export function ModelPicker() {
     return selectedModel.name;
   };
 
-  // Get auto provider models (if any)
-  const autoModels =
-    !loading && modelsByProviders && modelsByProviders["auto"]
-      ? modelsByProviders["auto"].filter((model) => {
-          if (
-            settings &&
-            !isDyadProEnabled(settings) &&
-            ["turbo", "value"].includes(model.apiName)
-          ) {
-            return false;
-          }
-          if (
-            settings &&
-            isDyadProEnabled(settings) &&
-            model.apiName === "free"
-          ) {
-            return false;
-          }
-          return true;
-        })
-      : [];
-
   // Determine availability of local models
   const hasOllamaModels =
     !ollamaLoading && !ollamaError && ollamaModels.length > 0;
@@ -142,21 +115,16 @@ export function ModelPicker() {
   }
   const selectedModel = settings?.selectedModel;
   const modelDisplayName = getModelDisplayName();
-  // Split providers into primary and secondary groups (excluding auto)
+  // Split providers into primary and secondary groups
   const providerEntries =
     !loading && modelsByProviders
-      ? Object.entries(modelsByProviders).filter(
-          ([providerId]) => providerId !== "auto",
-        )
+      ? Object.entries(modelsByProviders)
       : [];
   const primaryProviders = providerEntries.filter(([providerId, models]) => {
     if (models.length === 0) return false;
     const provider = providers?.find((p) => p.id === providerId);
     return !(provider && provider.secondary);
   });
-  if (settings && isDyadProEnabled(settings)) {
-    primaryProviders.unshift(["auto", TURBO_MODELS]);
-  }
   const secondaryProviders = providerEntries.filter(([providerId, models]) => {
     if (models.length === 0) return false;
     const provider = providers?.find((p) => p.id === providerId);
@@ -171,152 +139,34 @@ export function ModelPicker() {
         title={modelDisplayName}
       >
         <span className="truncate">
-          {modelDisplayName === "Auto" && (
-            <>
-              <span className="text-xs text-muted-foreground/70">
-                Model:
-              </span>{" "}
-            </>
-          )}
           {modelDisplayName}
         </span>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-64" align="start">
-        <DropdownMenuLabel>Cloud Models</DropdownMenuLabel>
+        <DropdownMenuLabel>Models</DropdownMenuLabel>
         <DropdownMenuSeparator />
 
-        {/* Trial user upgrade banner */}
-        {isTrial && (
+        {loading ? (
+          <div className="text-xs text-center py-2 text-muted-foreground">
+            Loading models...
+          </div>
+        ) : !modelsByProviders ||
+          Object.keys(modelsByProviders).length === 0 ? (
+          <div className="text-xs text-center py-2 text-muted-foreground">
+            No models available
+          </div>
+        ) : (
           <>
-            <div className="px-2 py-3 bg-gradient-to-r from-indigo-50 to-sky-50 dark:from-indigo-950/50 dark:to-sky-950/50">
-              <p className="text-sm text-indigo-700 dark:text-indigo-300 mb-2">
-                Upgrade from Dyad Pro trial to unlock more models.
-              </p>
-              <Button
-                variant="outline"
-                size="sm"
-                className="cursor-pointer w-full bg-indigo-600 hover:bg-indigo-700 text-white hover:text-white border-indigo-600"
-                onClick={() => {
-                  ipc.system.openExternalUrl(
-                    "https://academy.dyad.sh/subscription",
-                  );
-                  setOpen(false);
-                }}
-              >
-                Upgrade to Dyad Pro
-              </Button>
-            </div>
-            <DropdownMenuSeparator />
-            {/* Trial users only see the auto model */}
-            <DropdownMenuItem
-              className="bg-secondary"
-              onClick={() => {
-                onModelSelect({ name: "auto", provider: "auto" });
-                setOpen(false);
-              }}
-            >
-              <div className="flex justify-between items-start w-full">
-                <span>Auto</span>
-                <span className="text-[11px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-medium">
-                  Trial
-                </span>
-              </div>
-            </DropdownMenuItem>
-          </>
-        )}
-
-        {/* Cloud models - only show for non-trial users */}
-        {!isTrial &&
-          (loading ? (
-            <div className="text-xs text-center py-2 text-muted-foreground">
-              Loading models...
-            </div>
-          ) : !modelsByProviders ||
-            Object.keys(modelsByProviders).length === 0 ? (
-            <div className="text-xs text-center py-2 text-muted-foreground">
-              No cloud models available
-            </div>
-          ) : (
-            /* Cloud models loaded */
-            <>
-              {/* Auto models at top level if any */}
-              {autoModels.length > 0 && (
-                <>
-                  {autoModels.map((model) => (
-                    <DropdownMenuItem
-                      key={`auto-${model.apiName}`}
-                      title={model.description}
-                      className={
-                        selectedModel.provider === "auto" &&
-                        selectedModel.name === model.apiName
-                          ? "bg-secondary"
-                          : ""
-                      }
-                      onClick={() => {
-                        onModelSelect({
-                          name: model.apiName,
-                          provider: "auto",
-                        });
-                        setOpen(false);
-                      }}
-                    >
-                      <div className="flex justify-between items-start w-full">
-                        <span className="flex flex-col items-start">
-                          <span>{model.displayName}</span>
-                        </span>
-                        <div className="flex items-center gap-1.5">
-                          {model.tag && (
-                            <span
-                              className={cn(
-                                "text-[11px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-medium",
-                                model.tagColor,
-                              )}
-                            >
-                              {model.tag}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </DropdownMenuItem>
-                  ))}
-                  {Object.keys(modelsByProviders).length > 1 && (
-                    <DropdownMenuSeparator />
-                  )}
-                </>
-              )}
-
-              {/* Primary providers as submenus */}
-              {primaryProviders.map(([providerId, models]) => {
-                models = models.filter((model) => {
-                  // Don't show free models if Dyad Pro is enabled because
-                  // we will use the paid models (in Dyad Pro backend) which
-                  // don't have the free limitations.
-                  if (
-                    isDyadProEnabled(settings) &&
-                    model.apiName.endsWith(":free")
-                  ) {
-                    return false;
-                  }
-                  return true;
-                });
-                const provider = providers?.find((p) => p.id === providerId);
-                const providerDisplayName =
-                  provider?.id === "auto"
-                    ? "Dyad Turbo"
-                    : (provider?.name ?? providerId);
+            {/* Primary providers as submenus */}
+            {primaryProviders.map(([providerId, models]) => {
+              const provider = providers?.find((p) => p.id === providerId);
+              const providerDisplayName = provider?.name ?? providerId;
                 return (
                   <DropdownMenuSub key={providerId}>
                     <DropdownMenuSubTrigger className="w-full font-normal">
                       <div className="flex flex-col items-start w-full">
                         <div className="flex items-center gap-2">
                           <span>{providerDisplayName}</span>
-                          {provider?.type === "cloud" &&
-                            !provider?.secondary &&
-                            isDyadProEnabled(settings) && (
-                              <span className="text-[10px] bg-gradient-to-r from-indigo-600 via-indigo-500 to-indigo-600 bg-[length:200%_100%] animate-[shimmer_5s_ease-in-out_infinite] text-white px-1.5 py-0.5 rounded-full font-medium">
-                                Pro
-                              </span>
-                            )}
                           {provider?.type === "custom" && (
                             <span className="text-[10px] bg-amber-500/20 text-amber-700 px-1.5 py-0.5 rounded-full font-medium">
                               Custom
@@ -451,11 +301,9 @@ export function ModelPicker() {
                 </DropdownMenuSub>
               )}
             </>
-          ))}
+          )}
 
-        {/* Local Models - only show for non-trial users */}
-        {!isTrial && (
-          <>
+        <>
             <DropdownMenuSeparator />
             {/* Local Models Parent SubMenu */}
             <DropdownMenuSub>
@@ -639,7 +487,6 @@ export function ModelPicker() {
               </DropdownMenuSubContent>
             </DropdownMenuSub>
           </>
-        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

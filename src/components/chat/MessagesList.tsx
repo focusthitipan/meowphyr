@@ -3,7 +3,7 @@ import type { Message } from "@/ipc/types";
 import { forwardRef, useState, useCallback, useMemo } from "react";
 import { Virtuoso } from "react-virtuoso";
 import ChatMessage from "./ChatMessage";
-import { OpenRouterSetupBanner, SetupBanner } from "../SetupBanner";
+import { SetupBanner } from "../SetupBanner";
 
 import { useStreamChat } from "@/hooks/useStreamChat";
 import { selectedChatIdAtom } from "@/atoms/chatAtoms";
@@ -21,6 +21,7 @@ import { useSettings } from "@/hooks/useSettings";
 import { useUserBudgetInfo } from "@/hooks/useUserBudgetInfo";
 import { PromoMessage } from "./PromoMessage";
 import { isCancelledResponseContent } from "@/shared/chatCancellation";
+import { isDyadProEnabled } from "@/lib/schemas";
 
 interface MessagesListProps {
   messages: Message[];
@@ -74,6 +75,7 @@ function FooterComponent({ context }: { context?: FooterContext }) {
     userBudget,
     renderSetupBanner,
   } = context;
+  const isProEnabled = settings ? isDyadProEnabled(settings) : false;
 
   const questionnaireState =
     selectedChatId != null ? submittedChatIds.get(selectedChatId) : undefined;
@@ -252,7 +254,7 @@ function FooterComponent({ context }: { context?: FooterContext }) {
         </div>
       )}
       {isStreaming &&
-        !settings?.enableDyadPro &&
+        !isProEnabled &&
         !userBudget &&
         messages.length > 0 && (
           <PromoMessage
@@ -270,7 +272,7 @@ export const MessagesList = forwardRef<HTMLDivElement, MessagesListProps>(
     const appId = useAtomValue(selectedAppIdAtom);
     const { versions, revertVersion } = useVersions(appId);
     const { streamMessage, isStreaming } = useStreamChat();
-    const { isAnyProviderSetup, isProviderSetup } = useLanguageModelProviders();
+    const { isAnyProviderSetup } = useLanguageModelProviders();
     const { settings } = useSettings();
     const setMessagesById = useSetAtom(chatMessagesByIdAtom);
     const [isUndoLoading, setIsUndoLoading] = useState(false);
@@ -296,21 +298,11 @@ export const MessagesList = forwardRef<HTMLDivElement, MessagesListProps>(
     // Stabilize renderSetupBanner with proper dependencies
     const renderSetupBanner = useCallback(() => {
       const selectedModel = settings?.selectedModel;
-      if (
-        selectedModel?.name === "free" &&
-        selectedModel?.provider === "auto" &&
-        !isProviderSetup("openrouter")
-      ) {
-        return <OpenRouterSetupBanner className="w-full" />;
-      }
       if (!isAnyProviderSetup()) {
         return <SetupBanner />;
       }
       return null;
     }, [
-      settings?.selectedModel?.name,
-      settings?.selectedModel?.provider,
-      isProviderSetup,
       isAnyProviderSetup,
     ]);
 

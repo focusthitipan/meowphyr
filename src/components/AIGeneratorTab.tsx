@@ -12,8 +12,9 @@ import {
 import { ipc } from "@/ipc/types";
 import { showError } from "@/lib/toast";
 import { toast } from "sonner";
-import { useUserBudgetInfo } from "@/hooks/useUserBudgetInfo";
+import { useSettings } from "@/hooks/useSettings";
 import { AiAccessBanner } from "./ProBanner";
+import { isDyadProEnabled } from "@/lib/schemas";
 import type {
   ThemeGenerationMode,
   ThemeGenerationModel,
@@ -72,7 +73,8 @@ export function AIGeneratorTab({
   const generateFromUrlMutation = useGenerateThemeFromUrl();
   const isGenerating =
     generatePromptMutation.isPending || generateFromUrlMutation.isPending;
-  const { userBudget } = useUserBudgetInfo();
+  const { settings } = useSettings();
+  const isProEnabled = settings ? isDyadProEnabled(settings) : false;
   const { themeGenerationModelOptions, isLoadingThemeGenerationModelOptions } =
     useThemeGenerationModelOptions();
 
@@ -314,7 +316,7 @@ export function AIGeneratorTab({
   ]);
 
   // Show Pro-only locked state for non-Pro users
-  if (!userBudget) {
+  if (!isProEnabled) {
     return (
       <div className="space-y-4 mt-4">
         <div className="flex flex-col items-center justify-center py-8 px-4 border-2 border-dashed border-muted-foreground/25 rounded-lg bg-muted/10">

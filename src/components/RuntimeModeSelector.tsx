@@ -14,6 +14,7 @@ import { useAtomValue } from "jotai";
 import { appUrlAtom } from "@/atoms/appAtoms";
 import { useTranslation } from "react-i18next";
 import type { RuntimeMode2 } from "@/lib/schemas";
+import { isDyadProEnabled } from "@/lib/schemas";
 import { useState } from "react";
 import {
   AlertDialog,
@@ -49,9 +50,10 @@ export function RuntimeModeSelector() {
     return null;
   }
 
+  const isProEnabled = isDyadProEnabled(settings);
   const isDockerMode = settings?.runtimeMode2 === "docker";
   const isCloudMode = settings?.runtimeMode2 === "cloud";
-  const hasCloudSandboxAccess = Boolean(userBudget);
+  const hasCloudSandboxAccess = isProEnabled || Boolean(userBudget);
   const showCloudSandboxOption = shouldShowCloudSandboxOption({
     runtimeMode: settings.runtimeMode2 ?? "host",
     cloudSandboxExperimentEnabled: !!settings.experiments?.enableCloudSandbox,

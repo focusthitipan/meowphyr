@@ -74,6 +74,7 @@ import { cn } from "@/lib/utils";
 import { normalizePath } from "../../../shared/normalizePath";
 import { showError } from "@/lib/toast";
 import type { DeviceMode } from "@/lib/schemas";
+import { isDyadProEnabled } from "@/lib/schemas";
 import { queryKeys } from "@/lib/queryKeys";
 import { AnnotatorOnlyForPro } from "./AnnotatorOnlyForPro";
 import { useAttachments } from "@/hooks/useAttachments";
@@ -206,7 +207,7 @@ export const PreviewIframe = ({ loading }: { loading: boolean }) => {
   const { restartApp } = useRunApp();
   const { settings, updateSettings } = useSettings();
   const { userBudget } = useUserBudgetInfo();
-  const isProMode = !!userBudget;
+  const isProMode = settings ? isDyadProEnabled(settings) : false;
   const queryClient = useQueryClient();
 
   // Preserved URL state (persists across HMR-induced remounts)
@@ -1801,7 +1802,7 @@ export const PreviewIframe = ({ loading }: { loading: boolean }) => {
                     : { width: `${deviceWidthConfig[deviceMode]}px` }
                 }
               >
-                {userBudget ? (
+                {isProMode ? (
                   <Annotator
                     screenshotUrl={screenshotDataUrl}
                     onSubmit={addAttachments}

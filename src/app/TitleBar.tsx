@@ -35,6 +35,7 @@ import { showError, showSuccess } from "@/lib/toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/queryKeys";
 import { useTranslation } from "react-i18next";
+import { isDyadProEnabled } from "@/lib/schemas";
 
 export const TitleBar = () => {
   const [selectedAppId] = useAtom(selectedAppIdAtom);
@@ -78,7 +79,7 @@ export const TitleBar = () => {
   };
 
   const isDyadPro = !!settings?.providerSettings?.auto?.apiKey?.value;
-  const isDyadProEnabled = Boolean(settings?.enableDyadPro);
+  const isDyadProFeatureEnabled = settings ? isDyadProEnabled(settings) : false;
 
   return (
     <>
@@ -106,7 +107,9 @@ export const TitleBar = () => {
             {selectedApp ? selectedApp.name : "No app selected"}
           </TooltipContent>
         </Tooltip>
-        {isDyadPro && <DyadProButton isDyadProEnabled={isDyadProEnabled} />}
+        {isDyadPro && (
+          <DyadProButton isDyadProEnabled={isDyadProFeatureEnabled} />
+        )}
 
         <div className="flex-1 min-w-0 overflow-hidden no-app-region-drag">
           <ChatTabs selectedChatId={selectedChatId} />

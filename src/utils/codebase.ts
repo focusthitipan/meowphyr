@@ -4,7 +4,7 @@ import { gitIsIgnoredIso, gitListFilesNative } from "../ipc/utils/git_utils";
 import log from "electron-log";
 import { IS_TEST_BUILD } from "../ipc/utils/test_utils";
 import { glob } from "glob";
-import { AppChatContext } from "../lib/schemas";
+import { AppChatContext, isDyadProEnabled } from "../lib/schemas";
 import { readSettings } from "@/main/settings";
 import { AsyncVirtualFileSystem } from "../../shared/VirtualFilesystem";
 
@@ -493,7 +493,7 @@ export async function extractCodebase({
 }> {
   const settings = readSettings();
   const isSmartContextEnabled =
-    settings?.enableDyadPro && settings?.enableProSmartFilesContextMode;
+    isDyadProEnabled(settings) && settings?.enableProSmartFilesContextMode;
 
   try {
     await fsAsync.access(appPath);

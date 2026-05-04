@@ -35,6 +35,7 @@ import {
   resolveBuiltinModelAlias,
 } from "@/ipc/shared/remote_language_model_catalog";
 import { DyadError, DyadErrorKind } from "@/errors/dyad_error";
+import { isDyadProEnabled } from "@/lib/schemas";
 
 const logger = log.scope("themes_handlers");
 const handle = createLoggedHandler(logger);
@@ -613,7 +614,7 @@ Modern dark theme with purple accents for testing.
         };
       }
 
-      if (!settings.enableDyadPro) {
+      if (!isDyadProEnabled(settings)) {
         throw new Error(
           "Dyad Pro is required for AI theme generation. Please enable Dyad Pro in Settings.",
         );
@@ -766,7 +767,7 @@ Modern theme extracted from website for testing.
         };
       }
 
-      if (!settings.enableDyadPro) {
+      if (!isDyadProEnabled(settings)) {
         throw new Error(
           "Dyad Pro is required for AI theme generation. Please enable Dyad Pro in Settings.",
         );

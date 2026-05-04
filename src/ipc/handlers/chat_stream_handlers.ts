@@ -107,6 +107,7 @@ import { mcpManager } from "../utils/mcp_manager";
 import z from "zod";
 import {
   isBasicAgentMode,
+  isDyadProEnabled,
   isLocalAgentBackedMode,
   isSupabaseConnected,
   isTurboEditsV2Enabled,
@@ -563,7 +564,7 @@ ${componentSnippet}
         chatModeFallbackReason,
       });
       // Only Dyad Pro requests have request ids.
-      if (settings.enableDyadPro) {
+      if (isDyadProEnabled(settings)) {
         // Generate requestId early so it can be saved with the message
         dyadRequestId = uuidv4();
       }

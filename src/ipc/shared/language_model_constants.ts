@@ -321,50 +321,6 @@ export const MODEL_OPTIONS: Record<string, ModelOption[]> = {
       dollarSigns: 2,
     },
   ],
-  auto: [
-    {
-      name: "auto",
-      displayName: "Auto",
-      description: "Automatically selects the best model",
-      tag: "Default",
-      // The following is reasonable defaults.
-      maxOutputTokens: 32_000,
-      contextWindow: 200_000,
-      temperature: 0,
-    },
-    {
-      name: "free",
-      displayName: "Free (OpenRouter)",
-      description: "Selects from one of the free OpenRouter models",
-      tag: "Free",
-      // These are below Gemini 2.5 Pro & Flash limits
-      // which are the ones defaulted to for both regular auto
-      // and smart auto.
-      maxOutputTokens: 32_000,
-      contextWindow: 128_000,
-      temperature: 0,
-    },
-    {
-      name: "turbo",
-      displayName: "Turbo (Pro)",
-      description: "Use very fast open-source frontier models",
-      maxOutputTokens: 32_000,
-      contextWindow: 256_000,
-      temperature: 0,
-      tag: "Fast",
-      tagColor: "bg-rose-800 text-white",
-    },
-    {
-      name: "value",
-      displayName: "Super Value (Pro)",
-      description: "Uses the most cost-effective models available",
-      maxOutputTokens: 32_000,
-      contextWindow: 256_000,
-      temperature: 0,
-      tag: "Budget",
-      tagColor: "bg-emerald-700 text-white",
-    },
-  ],
   azure: [
     {
       name: "gpt-5.1",
@@ -529,29 +485,6 @@ export const MODEL_OPTIONS: Record<string, ModelOption[]> = {
   ],
 };
 
-export const TURBO_MODELS: LanguageModel[] = [
-  {
-    apiName: "glm-4.7:turbo",
-    displayName: "GLM 4.7",
-    description: "Strong coding model (very fast)",
-    maxOutputTokens: 32_000,
-    contextWindow: 131_000,
-    temperature: 0.7,
-    dollarSigns: 3,
-    type: "cloud",
-  },
-  {
-    apiName: "kimi-k2:turbo",
-    displayName: "Kimi K2",
-    description: "Kimi 0905 update (fast)",
-    maxOutputTokens: 16_000,
-    contextWindow: 256_000,
-    temperature: 0,
-    dollarSigns: 2,
-    type: "cloud",
-  },
-];
-
 export const FREE_OPENROUTER_MODEL_NAMES = MODEL_OPTIONS.openrouter
   .filter(
     (model) => model.name.endsWith(":free") || model.name.endsWith("/free"),
@@ -610,11 +543,6 @@ export const CLOUD_PROVIDERS: Record<
     hasFreeTier: true,
     websiteUrl: "https://openrouter.ai/settings/keys",
     gatewayPrefix: "openrouter/",
-  },
-  auto: {
-    displayName: "Dyad",
-    websiteUrl: "https://academy.dyad.sh/subscription",
-    gatewayPrefix: "dyad/",
   },
   azure: {
     displayName: "Azure OpenAI",

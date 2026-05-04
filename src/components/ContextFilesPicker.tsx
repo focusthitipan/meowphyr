@@ -19,7 +19,7 @@ import {
 } from "./ui/tooltip";
 import { useSettings } from "@/hooks/useSettings";
 import { useContextPaths } from "@/hooks/useContextPaths";
-import type { ContextPathResult } from "@/lib/schemas";
+import { isDyadProEnabled, type ContextPathResult } from "@/lib/schemas";
 
 export function ContextFilesPicker() {
   const { settings } = useSettings();
@@ -116,7 +116,8 @@ export function ContextFilesPicker() {
   };
 
   const isSmartContextEnabled =
-    settings?.enableDyadPro && settings?.enableProSmartFilesContextMode;
+    (settings ? isDyadProEnabled(settings) : false) &&
+    settings?.enableProSmartFilesContextMode;
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
