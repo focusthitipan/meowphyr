@@ -189,7 +189,7 @@ export async function getLanguageModelsByProviders(): Promise<
 
   // Fetch all models concurrently
   const modelPromises = providers
-    .filter((p) => p.type !== "local")
+    .filter((p) => p.type !== "local" && p.id !== "auto")
     .map(async (provider) => {
       const models = await getLanguageModels({ providerId: provider.id });
       return { providerId: provider.id, models };

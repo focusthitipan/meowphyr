@@ -143,6 +143,21 @@ export const languageModelContracts = {
     input: z.void(),
     output: z.object({ models: z.array(LocalModelSchema) }),
   }),
+
+  fetchProviderModelList: defineContract({
+    channel: "fetch-provider-model-list",
+    input: z.object({ providerId: z.string() }),
+    output: z.object({
+      models: z.array(z.string()),
+      alreadyAdded: z.array(z.string()),
+    }),
+  }),
+
+  importSelectedProviderModels: defineContract({
+    channel: "import-selected-provider-models",
+    input: z.object({ providerId: z.string(), modelIds: z.array(z.string()) }),
+    output: z.object({ added: z.number() }),
+  }),
 } as const;
 
 // =============================================================================

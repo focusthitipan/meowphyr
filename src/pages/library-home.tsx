@@ -15,8 +15,7 @@ import {
   type FilterType,
 } from "@/components/LibraryFilterTabs";
 import { DyadAppMediaFolder } from "@/components/DyadAppMediaFolder";
-import { ImageGeneratorDialog } from "@/components/ImageGeneratorDialog";
-import { ImageGenerationProgressButton } from "@/components/ImageGenerationProgressButton";
+
 import { filterMediaAppsByQuery } from "@/lib/mediaUtils";
 // ---------------------------------------------------------------------------
 // Main Library Homepage
@@ -50,8 +49,6 @@ export default function LibraryHomePage() {
   } = useAppMediaFiles();
   const { apps: allApps } = useLoadApps();
   const [createThemeDialogOpen, setCreateThemeDialogOpen] = useState(false);
-  const [imageGeneratorOpen, setImageGeneratorOpen] = useState(false);
-
   // Deep link support
   const {
     prefillData,
@@ -129,14 +126,10 @@ export default function LibraryHomePage() {
               <BookOpen className="inline-block h-8 w-8 mr-2" />
               Library
             </h1>
-            <div className="flex items-center gap-2">
-              <ImageGenerationProgressButton />
-              <NewLibraryItemMenu
+            <NewLibraryItemMenu
                 onNewPrompt={() => setPromptDialogOpen(true)}
                 onNewTheme={() => setCreateThemeDialogOpen(true)}
-                onNewImage={() => setImageGeneratorOpen(true)}
               />
-            </div>
           </div>
 
           {/* Dialogs (controlled externally) */}
@@ -209,10 +202,6 @@ export default function LibraryHomePage() {
           onOpenChange={setCreateThemeDialogOpen}
         />
 
-        <ImageGeneratorDialog
-          open={imageGeneratorOpen}
-          onOpenChange={setImageGeneratorOpen}
-        />
       </div>
     </div>
   );

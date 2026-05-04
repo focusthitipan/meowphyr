@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useAtom, useSetAtom } from "jotai";
-import { homeChatInputValueAtom } from "../atoms/chatAtoms";
+import { homeChatInputValueAtom, homeSelectedAppAtom } from "../atoms/chatAtoms";
 import { ipc } from "@/ipc/types";
 import { generateCuteAppName } from "@/lib/utils";
 import { useLoadApps } from "@/hooks/useLoadApps";
@@ -12,7 +12,6 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useStreamChat } from "@/hooks/useStreamChat";
 import { HomeChatInput } from "@/components/chat/HomeChatInput";
 import { usePostHog } from "posthog-js/react";
-import { PrivacyBanner } from "@/components/TelemetryBanner";
 import { INSPIRATION_PROMPTS } from "@/prompts/inspiration_prompts";
 import { useAppVersion } from "@/hooks/useAppVersion";
 
@@ -59,6 +58,8 @@ export interface HomeSubmitOptions {
 export default function HomePage() {
   const { t } = useTranslation("home");
   const [inputValue, setInputValue] = useAtom(homeChatInputValueAtom);
+  const [selectedAppForInput] = useAtom(homeSelectedAppAtom);
+  const [appNameInput, setAppNameInput] = useState("");
   const navigate = useNavigate();
   const search = useSearch({ from: "/" });
   const { refreshApps } = useLoadApps();
@@ -196,7 +197,7 @@ export default function HomePage() {
       } else {
         // New app flow (default behavior)
         const result = await ipc.app.createApp({
-          name: generateCuteAppName(),
+          name: appNameInput.trim() || generateCuteAppName(),
           initialChatMode,
         });
         chatId = result.chatId;
@@ -234,6 +235,7 @@ export default function HomePage() {
       );
 
       setInputValue("");
+      setAppNameInput("");
       setIsPreviewOpen(false);
       await refreshApps();
       await invalidateAppQuery(queryClient, { appId });
@@ -301,6 +303,15 @@ export default function HomePage() {
           <div className="flex items-center justify-center gap-4 mb-4">
             <ImportAppButton className="px-0 pb-0 flex-none" />
           </div>
+          {!selectedAppForInput && (
+            <input
+              type="text"
+              value={appNameInput}
+              onChange={(e) => setAppNameInput(e.target.value)}
+              placeholder="App name (optional — leave blank to auto-generate)"
+              className="w-full mb-2 px-4 py-2 rounded-xl border border-gray-200 bg-white/50 backdrop-blur-sm text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/40 dark:bg-gray-800/50 dark:border-gray-700 dark:text-gray-200 dark:placeholder-gray-500"
+            />
+          )}
           <HomeChatInput onSubmit={handleSubmit} />
 
           <div className="flex flex-col gap-4 mt-2">
@@ -361,7 +372,6 @@ export default function HomePage() {
           </div>
           <ProBanner />
         </div>
-        <PrivacyBanner />
 
         {/* Release Notes Dialog */}
         <Dialog open={releaseNotesOpen} onOpenChange={setReleaseNotesOpen}>

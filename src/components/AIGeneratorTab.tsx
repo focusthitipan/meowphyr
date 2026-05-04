@@ -60,6 +60,7 @@ export function AIGeneratorTab({
     useState<ThemeGenerationMode>("inspired");
   const [aiSelectedModel, setAiSelectedModel] =
     useState<ThemeGenerationModel>("");
+  const [aiSelectedProvider, setAiSelectedProvider] = useState<string>("");
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Track if dialog is open to prevent orphaned uploads from adding images after close
@@ -106,19 +107,43 @@ export function AIGeneratorTab({
     isDialogOpenRef.current = isDialogOpen;
   }, [isDialogOpen]);
 
+  // Derived: unique providers from model options
+  const providers = themeGenerationModelOptions.reduce(
+    (acc, option) => {
+      const providerId = option.id.split("::")[0] ?? "";
+      const providerName = option.label.split(" / ")[0] ?? "";
+      if (providerId && !acc.some((p) => p.id === providerId)) {
+        acc.push({ id: providerId, name: providerName });
+      }
+      return acc;
+    },
+    [] as { id: string; name: string }[],
+  );
+
+  // Derived: models filtered by selected provider
+  const modelsForSelectedProvider = themeGenerationModelOptions.filter(
+    (option) => option.id.startsWith(`${aiSelectedProvider}::`) || (providers.length === 1 && !aiSelectedProvider),
+  );
+
   useEffect(() => {
-    const firstModelId = themeGenerationModelOptions[0]?.id ?? "";
-    if (!firstModelId) {
-      return;
+    if (themeGenerationModelOptions.length === 0) return;
+
+    const firstProviderId = providers[0]?.id ?? "";
+    if (!aiSelectedProvider || !providers.some((p) => p.id === aiSelectedProvider)) {
+      setAiSelectedProvider(firstProviderId);
     }
+  }, [themeGenerationModelOptions]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (modelsForSelectedProvider.length === 0) return;
 
     if (
       !aiSelectedModel ||
-      !themeGenerationModelOptions.some((model) => model.id === aiSelectedModel)
+      !modelsForSelectedProvider.some((model) => model.id === aiSelectedModel)
     ) {
-      setAiSelectedModel(firstModelId);
+      setAiSelectedModel(modelsForSelectedProvider[0]?.id ?? "");
     }
-  }, [aiSelectedModel, themeGenerationModelOptions]);
+  }, [aiSelectedProvider, modelsForSelectedProvider]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keep a ref to current images for cleanup without causing effect re-runs
   const aiImagesRef = useRef<ThemeImage[]>([]);
@@ -137,6 +162,7 @@ export function AIGeneratorTab({
       }
       setAiKeywords("");
       setAiGenerationMode("inspired");
+      setAiSelectedProvider(providers[0]?.id ?? "");
       setAiSelectedModel(themeGenerationModelOptions[0]?.id ?? "");
       setInputSource("images");
       setWebsiteUrl("");
@@ -525,42 +551,76 @@ export function AIGeneratorTab({
         </div>
       </div>
 
-      {/* Model Selection */}
+      {/* Provider & Model Selection */}
       <div className="space-y-3">
-        <Label>Model Selection</Label>
-        <div
-          className="grid grid-cols-[repeat(auto-fit,minmax(8rem,1fr))] gap-3"
-          role="radiogroup"
-          aria-label="Model Selection"
-        >
-          {isLoadingThemeGenerationModelOptions ? (
-            <div className="col-span-full flex items-center justify-center py-3 text-sm text-muted-foreground">
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Loading models...
-            </div>
-          ) : themeGenerationModelOptions.length === 0 ? (
-            <div className="col-span-full text-center py-3 text-sm text-muted-foreground">
-              No models available
-            </div>
-          ) : (
-            themeGenerationModelOptions.map((modelOption) => (
-              <button
-                key={modelOption.id}
-                type="button"
-                role="radio"
-                aria-checked={aiSelectedModel === modelOption.id}
-                onClick={() => setAiSelectedModel(modelOption.id)}
-                className={`flex flex-col items-center rounded-lg border p-3 text-center transition-colors ${
-                  aiSelectedModel === modelOption.id
-                    ? "border-primary bg-primary/5"
-                    : "hover:bg-muted/50"
-                }`}
+        {isLoadingThemeGenerationModelOptions ? (
+          <div className="flex items-center justify-center py-3 text-sm text-muted-foreground">
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Loading models...
+          </div>
+        ) : themeGenerationModelOptions.length === 0 ? (
+          <div className="text-center py-3 text-sm text-muted-foreground">
+            No models available
+          </div>
+        ) : (
+          <>
+            {/* Provider Selection */}
+            <div className="space-y-2">
+              <Label>Provider</Label>
+              <div
+                className="flex flex-wrap gap-2"
+                role="radiogroup"
+                aria-label="Provider Selection"
               >
-                <span className="font-medium text-sm">{modelOption.label}</span>
-              </button>
-            ))
-          )}
-        </div>
+                {providers.map((provider) => (
+                  <button
+                    key={provider.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={aiSelectedProvider === provider.id}
+                    onClick={() => setAiSelectedProvider(provider.id)}
+                    className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
+                      aiSelectedProvider === provider.id
+                        ? "border-primary bg-primary/5"
+                        : "hover:bg-muted/50"
+                    }`}
+                  >
+                    {provider.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Model Selection */}
+            <div className="space-y-2">
+              <Label>Model</Label>
+              <div
+                className="grid grid-cols-[repeat(auto-fit,minmax(8rem,1fr))] gap-3"
+                role="radiogroup"
+                aria-label="Model Selection"
+              >
+                {modelsForSelectedProvider.map((modelOption) => (
+                  <button
+                    key={modelOption.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={aiSelectedModel === modelOption.id}
+                    onClick={() => setAiSelectedModel(modelOption.id)}
+                    className={`flex flex-col items-center rounded-lg border p-3 text-center transition-colors ${
+                      aiSelectedModel === modelOption.id
+                        ? "border-primary bg-primary/5"
+                        : "hover:bg-muted/50"
+                    }`}
+                  >
+                    <span className="font-medium text-sm">
+                      {modelOption.label.split(" / ")[1] ?? modelOption.label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Generate Button */}

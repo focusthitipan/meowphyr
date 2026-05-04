@@ -31,11 +31,11 @@ const logger = log.scope("settings");
 // Need to maintain backwards compatibility!
 const DEFAULT_SETTINGS: UserSettings = {
   selectedModel: {
-    name: "auto",
-    provider: "auto",
+    name: "gemini-3-flash-preview",
+    provider: "google",
   },
   providerSettings: {},
-  telemetryConsent: "unset",
+  telemetryConsent: "opted_out",
   telemetryUserId: uuidv4(),
   hasRunBefore: false,
   experiments: {},
@@ -45,6 +45,8 @@ const DEFAULT_SETTINGS: UserSettings = {
   enableAutoFixProblems: false,
   enableAutoUpdate: true,
   releaseChannel: "stable",
+  imageGenerationBaseUrl: "https://api.openai.com/v1",
+  imageGenerationModel: "gpt-image-1",
   selectedTemplateId: DEFAULT_TEMPLATE_ID,
   selectedThemeId: DEFAULT_THEME_ID,
   isRunning: false,

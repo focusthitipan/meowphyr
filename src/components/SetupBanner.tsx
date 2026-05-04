@@ -34,7 +34,6 @@ import logo from "../../assets/logo.svg";
 import googleIcon from "../../assets/ai-logos/google-g-icon.svg";
 // @ts-ignore
 import openrouterLogo from "../../assets/ai-logos/openrouter-logo.png";
-import { OnboardingBanner } from "./home/OnboardingBanner";
 import { showError } from "@/lib/toast";
 import { useSettings } from "@/hooks/useSettings";
 import { DyadProTrialDialog } from "./DyadProTrialDialog";
@@ -49,7 +48,6 @@ export function SetupBanner() {
   const { t } = useTranslation("home");
   const posthog = usePostHog();
   const navigate = useNavigate();
-  const [isOnboardingVisible, setIsOnboardingVisible] = useState(true);
   const { isAnyProviderSetup, isLoading: loading } =
     useLanguageModelProviders();
   const [nodeSystemInfo, setNodeSystemInfo] = useState<NodeSystemInfo | null>(
@@ -185,10 +183,6 @@ export function SetupBanner() {
       <p className="text-xl font-medium text-zinc-700 dark:text-zinc-300 p-4 pt-6">
         {t("setup.setupDyad")}
       </p>
-      <OnboardingBanner
-        isVisible={isOnboardingVisible}
-        setIsVisible={setIsOnboardingVisible}
-      />
       <div className={bannerClasses}>
         <Accordion multiple className="w-full" defaultValue={itemsNeedAction}>
           <AccordionItem
@@ -324,18 +318,7 @@ export function SetupBanner() {
                 Not sure what to do? Watch the Get Started video above ☝️
               </p>
 
-              <SetupProviderCard
-                variant="dyad"
-                onClick={handleDyadProSetupClick}
-                tabIndex={isNodeSetupComplete ? 0 : -1}
-                leadingIcon={
-                  <img src={logo} alt="Dyad Logo" className="w-6 h-6 mr-0.5" />
-                }
-                title="Start with Dyad Pro free trial"
-                subtitle="Unlock the full power of Dyad"
-                chip={<>Recommended</>}
-              />
-              <div className="mt-2 flex gap-2">
+              <div className="flex gap-2">
                 <SetupProviderCard
                   className="flex-1"
                   variant="google"

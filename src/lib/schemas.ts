@@ -343,6 +343,10 @@ const BaseUserSettingsFields = {
   language: LanguageSchema.optional(),
   previewDeviceMode: DeviceModeSchema.optional(),
 
+  imageGenerationBaseUrl: z.string().optional(),
+  imageGenerationApiKey: z.string().optional(),
+  imageGenerationModel: z.string().optional(),
+
   enableAutoFixProblems: z.boolean().optional(),
   autoExpandPreviewPanel: z.boolean().optional(),
   enableChatEventNotifications: z.boolean().optional(),

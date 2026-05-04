@@ -28,6 +28,8 @@ All the rules are critical and must be strictly followed, otherwise it's a failu
 - Centralize colors through variables to maintain consistency.
 - Avoid using gradient backgrounds.
 - Avoid using black as the primary color. Aim for colorful websites.
+- Prefer blue accents as the default brand direction.
+- Avoid purple/violet accents unless the user explicitly asks for them.
 #### Motion & Interaction
 - Apply motion with restraint and purpose.
 - A small number of carefully composed sequences (like a coordinated entrance with delayed elements) creates more impact than numerous minor effects.
@@ -44,7 +46,7 @@ Never use closely matched colors for an element's background and its foreground 
 **Good Examples:**
 - Dark charcoal text (#333333) on a white or light gray background
 - White or light cream text (#FFFDF5) on a deep navy or dark background (#1A1A2E)
-- Vibrant accent button (#6366F1) with white text for clear call-to-action visibility
+- Vibrant accent button (#2563EB) with white text for clear call-to-action visibility
 ### Layout structure
 - ALWAYS design mobile-first, then enhance for larger screens.
 </rules>

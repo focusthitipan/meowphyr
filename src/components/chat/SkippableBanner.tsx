@@ -11,13 +11,13 @@ interface SkippableBannerProps {
 }
 
 const colors = {
-  container: "bg-indigo-50/60 dark:bg-indigo-900/30",
+  container: "bg-blue-50/60 dark:bg-blue-900/30",
   ring: "ring-black/5 dark:ring-white/10",
-  icon: "text-indigo-600 dark:text-indigo-200 bg-indigo-100 dark:bg-white/15",
-  text: "text-indigo-900 dark:text-indigo-100",
-  enableBtn: "bg-white/90 hover:bg-white text-indigo-800 shadow font-semibold",
+  icon: "text-blue-600 dark:text-blue-200 bg-blue-100 dark:bg-white/15",
+  text: "text-blue-900 dark:text-blue-100",
+  enableBtn: "bg-white/90 hover:bg-white text-blue-800 shadow font-semibold",
   skipBtn:
-    "text-indigo-600 dark:text-indigo-200 hover:text-indigo-800 dark:hover:text-indigo-100",
+    "text-blue-600 dark:text-blue-200 hover:text-blue-800 dark:hover:text-blue-100",
 };
 
 export function SkippableBanner({
@@ -38,7 +38,7 @@ export function SkippableBanner({
         <button
           type="button"
           onClick={onSkip}
-          className={`absolute -top-2 -right-2 inline-flex items-center justify-center rounded-full p-1 transition-colors duration-150 ${c.skipBtn} cursor-pointer bg-white dark:bg-indigo-800 ring-1 ring-inset ${c.ring} shadow-sm`}
+          className={`absolute -top-2 -right-2 inline-flex items-center justify-center rounded-full p-1 transition-colors duration-150 ${c.skipBtn} cursor-pointer bg-white dark:bg-blue-800 ring-1 ring-inset ${c.ring} shadow-sm`}
           aria-label="Dismiss"
         >
           <X className="h-3.5 w-3.5" />

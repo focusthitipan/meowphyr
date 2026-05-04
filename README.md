@@ -1,10 +1,28 @@
-# Dyad
+# Dyad (focusthitipan fork)
+
+This is a personal fork of [dyad-sh/dyad](https://github.com/dyad-sh/dyad) with the following customizations:
+
+### UI / UX
+- Removed Dyad Pro / server-dependent UI (onboarding banner, free trial card)
+- Removed the `auto` (Dyad Pro) provider from the model picker
+- Default model changed to `gemini-2.5-flash-preview` (Google)
+- Release channel selector now correctly routes the auto-updater to stable or beta GitHub releases from this fork
+
+### Dyad Pro feature gating
+- Centralized all Dyad Pro feature checks using the `isDyadProEnabled` utility across TitleBar, ModelPicker, ChatInput, TokenBar, PreviewIframe, and IPC handlers
+- Re-enabled Pro bypass so local Pro features work without a subscription
+- Removed unused Dyad Pro model constants and cloud client code (~500 lines)
+
+### Cross-platform stability
+- Normalized path handling for Windows (drive-letter / UNC path detection, no false positives on POSIX paths containing backslash)
+- Fixed symlink edge cases during recursive copy: skip symlinked directories to prevent cycles, follow symlink-to-file entries, and handle broken symlinks gracefully
+- Stabilized Windows-specific assertions in the unit-test suite
+
+---
 
 Dyad is a local, open-source AI app builder. It's fast, private, and fully under your control — like Lovable, v0, or Bolt, but running right on your machine.
 
-[![Image](https://github.com/user-attachments/assets/f6c83dfc-6ffd-4d32-93dd-4b9c46d17790)](https://dyad.sh/)
-
-More info at: [https://dyad.sh/](https://dyad.sh/)
+More info about the original project: [https://dyad.sh/](https://dyad.sh/)
 
 ## 🚀 Features
 
@@ -16,17 +34,13 @@ More info at: [https://dyad.sh/](https://dyad.sh/)
 
 No sign-up required. Just download and go.
 
-### [👉 Download for your platform](https://www.dyad.sh/#download)
-
-## 🤝 Community
-
-Join our growing community of AI app builders on **Reddit**: [r/dyadbuilders](https://www.reddit.com/r/dyadbuilders/) - share your projects and get help from the community!
+Releases for this fork: [https://github.com/focusthitipan/dyad/releases](https://github.com/focusthitipan/dyad/releases)
 
 ## 🛠️ Contributing
 
 **Dyad** is open-source (see License info below).
 
-If you're interested in contributing to dyad, please read our [contributing](./CONTRIBUTING.md) doc.
+If you're interested in contributing to the upstream project, please read their [contributing](./CONTRIBUTING.md) doc.
 
 ## License
 

@@ -22,8 +22,8 @@ const logger = log.scope("image_generation_handlers");
 // Track active generation controllers so they can be cancelled from the renderer
 const activeControllers = new Map<string, AbortController>();
 
-const DYAD_ENGINE_URL =
-  process.env.DYAD_ENGINE_URL ?? "https://engine.dyad.sh/v1";
+const DEFAULT_IMAGE_GENERATION_BASE_URL = "https://api.openai.com/v1";
+const DEFAULT_IMAGE_GENERATION_MODEL = "gpt-image-1";
 
 const IMAGE_GENERATION_TIMEOUT_MS = 120_000;
 const MAX_IMAGE_SIZE = 50 * 1024 * 1024; // 50 MB
@@ -43,11 +43,13 @@ export function registerImageGenerationHandlers() {
     imageGenerationContracts.generateImage,
     async (_, params) => {
       const settings = readSettings();
-      const apiKey = settings.providerSettings?.auto?.apiKey?.value;
+      const baseUrl = settings.imageGenerationBaseUrl ?? DEFAULT_IMAGE_GENERATION_BASE_URL;
+      const apiKey = settings.imageGenerationApiKey;
+      const model = settings.imageGenerationModel ?? DEFAULT_IMAGE_GENERATION_MODEL;
 
       if (!apiKey) {
         throw new DyadError(
-          "Dyad Pro API key is required for image generation",
+          "Image Generation API key is not configured. Please set it in Settings > Advanced > Image Generation.",
           DyadErrorKind.Auth,
         );
       }
@@ -74,16 +76,15 @@ export function registerImageGenerationHandlers() {
 
       let response: Response;
       try {
-        response = await fetch(`${DYAD_ENGINE_URL}/images/generations`, {
+        response = await fetch(`${baseUrl}/images/generations`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${apiKey}`,
-            "X-Dyad-Request-Id": requestId,
           },
           body: JSON.stringify({
             prompt: fullPrompt,
-            model: "gpt-image-1.5",
+            model,
           }),
           signal: controller.signal,
         });

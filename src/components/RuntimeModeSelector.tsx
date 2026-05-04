@@ -34,7 +34,8 @@ export function shouldShowCloudSandboxOption({
   runtimeMode: RuntimeMode2;
   cloudSandboxExperimentEnabled: boolean;
 }) {
-  return cloudSandboxExperimentEnabled || runtimeMode === "cloud";
+  // Cloud Sandbox requires Dyad server — always hidden
+  return false;
 }
 
 export function RuntimeModeSelector() {
@@ -103,7 +104,7 @@ export function RuntimeModeSelector() {
               <SelectItem value="docker">Docker (experimental)</SelectItem>
               {showCloudSandboxOption && (
                 <SelectItem disabled={!hasCloudSandboxAccess} value="cloud">
-                  Cloud Sandbox (Pro)
+                  Cloud Sandbox
                 </SelectItem>
               )}
             </SelectContent>

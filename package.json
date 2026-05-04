@@ -5,12 +5,12 @@
   "keywords": [],
   "license": "MIT",
   "author": {
-    "name": "Will Chen",
-    "email": "willchen90@gmail.com"
+    "name": "Thitipan Punnaputtipong",
+    "email": "focusthitipan@hotmail.co.th"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/dyad-sh/dyad.git"
+    "url": "https://github.com/focusthitipan/dyad.git"
   },
   "main": ".vite/build/main.js",
   "scripts": {

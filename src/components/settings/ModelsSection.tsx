@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { AlertTriangle, PlusIcon, TrashIcon } from "lucide-react";
+import { AlertTriangle, DownloadIcon, PlusIcon, TrashIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { CreateCustomModelDialog } from "@/components/CreateCustomModelDialog";
 import { EditCustomModelDialog } from "@/components/EditCustomModelDialog";
+import { FetchModelsDialog } from "@/components/FetchModelsDialog";
 import { useLanguageModelsForProvider } from "@/hooks/useLanguageModelsForProvider"; // Use the hook directly here
 import { useDeleteCustomModel } from "@/hooks/useDeleteCustomModel"; // Import the new hook
 import {
@@ -22,11 +23,13 @@ import { queryKeys } from "@/lib/queryKeys";
 
 interface ModelsSectionProps {
   providerId: string;
+  providerType?: "custom" | "local" | "cloud";
 }
 
-export function ModelsSection({ providerId }: ModelsSectionProps) {
+export function ModelsSection({ providerId, providerType }: ModelsSectionProps) {
   const [isCustomModelDialogOpen, setIsCustomModelDialogOpen] = useState(false);
   const [isEditModelDialogOpen, setIsEditModelDialogOpen] = useState(false);
+  const [isFetchModelsDialogOpen, setIsFetchModelsDialogOpen] = useState(false);
   const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] =
     useState(false);
   const [modelToDelete, setModelToDelete] = useState<string | null>(null);
@@ -41,6 +44,10 @@ export function ModelsSection({ providerId }: ModelsSectionProps) {
     queryClient.invalidateQueries({
       queryKey: queryKeys.languageModels.byProviders,
     });
+  };
+
+  const handleFetchModels = () => {
+    setIsFetchModelsDialogOpen(true);
   };
 
   // Fetch custom models within this component now
@@ -210,13 +217,23 @@ export function ModelsSection({ providerId }: ModelsSectionProps) {
       {/* End Custom Models List Area */}
 
       {providerId !== "auto" && (
-        <Button
-          onClick={() => setIsCustomModelDialogOpen(true)}
-          variant="outline"
-          className="mt-6"
-        >
-          <PlusIcon className="mr-2 h-4 w-4" /> Add Custom Model
-        </Button>
+        <div className="flex flex-wrap gap-3 mt-6">
+          <Button
+            onClick={() => setIsCustomModelDialogOpen(true)}
+            variant="outline"
+          >
+            <PlusIcon className="mr-2 h-4 w-4" /> Add Custom Model
+          </Button>
+          {providerType === "custom" && (
+            <Button
+              onClick={handleFetchModels}
+              variant="outline"
+            >
+              <DownloadIcon className="mr-2 h-4 w-4" />
+              Fetch Models from API
+            </Button>
+          )}
+        </div>
       )}
 
       {/* Render the dialogs */}
@@ -239,6 +256,15 @@ export function ModelsSection({ providerId }: ModelsSectionProps) {
         }}
         providerId={providerId}
         model={modelToEdit}
+      />
+
+      <FetchModelsDialog
+        isOpen={isFetchModelsDialogOpen}
+        onClose={() => setIsFetchModelsDialogOpen(false)}
+        onSuccess={() => {
+          invalidateModels();
+        }}
+        providerId={providerId}
       />
 
       <AlertDialog

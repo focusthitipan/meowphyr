@@ -254,23 +254,6 @@ export const SETTINGS_SEARCH_INDEX: SearchableSettingItem[] = [
     sectionLabel: "Model Providers",
   },
 
-  // Telemetry
-  {
-    id: SETTING_IDS.telemetry,
-    label: "Telemetry",
-    description: "Enable or disable anonymous usage data collection",
-    keywords: [
-      "telemetry",
-      "analytics",
-      "usage",
-      "data",
-      "privacy",
-      "tracking",
-    ],
-    sectionId: SECTION_IDS.telemetry,
-    sectionLabel: "Telemetry",
-  },
-
   // Integrations
   {
     id: SETTING_IDS.github,

@@ -31,17 +31,79 @@ import type {
 } from "@/ipc/types";
 import { webCrawlResponseSchema } from "./local_agent/tools/web_crawl";
 import {
-  getThemeGenerationModelOptions,
   resolveBuiltinModelAlias,
 } from "@/ipc/shared/remote_language_model_catalog";
+import {
+  getLanguageModelProviders,
+  getLanguageModels,
+} from "@/ipc/shared/language_model_helpers";
 import { DyadError, DyadErrorKind } from "@/errors/dyad_error";
-import { isDyadProEnabled } from "@/lib/schemas";
+import {
+  isDyadProEnabled,
+  type UserSettings,
+  type AzureProviderSetting,
+  type VertexProviderSetting,
+} from "@/lib/schemas";
 
 const logger = log.scope("themes_handlers");
 const handle = createLoggedHandler(logger);
 
 // Timeout for web crawl requests (120 seconds)
 const WEB_CRAWL_TIMEOUT_MS = 120_000;
+
+/**
+ * Checks if a provider has credentials configured in settings.
+ */
+function isProviderConfiguredInSettings(
+  providerId: string,
+  settings: UserSettings,
+): boolean {
+  if (providerId === "auto") return false;
+  const ps = settings.providerSettings;
+  if (!ps) return false;
+
+  if (providerId === "vertex") {
+    const vs = ps["vertex"] as VertexProviderSetting | undefined;
+    return !!(vs?.serviceAccountKey?.value && vs?.projectId && vs?.location);
+  }
+
+  if (providerId === "azure") {
+    const as = ps["azure"] as AzureProviderSetting | undefined;
+    return !!(as?.apiKey?.value && as?.resourceName);
+  }
+
+  return !!(ps[providerId]?.apiKey?.value);
+}
+
+/**
+ * Resolves a model param which can be either:
+ * - A builtin alias (e.g. "dyad/theme-generator/google")
+ * - A direct provider::model format (e.g. "google::gemini-3.1-pro-preview")
+ */
+async function resolveModelParam(
+  model: string,
+): Promise<{ providerId: string; apiName: string } | null> {
+  // Try builtin alias first
+  const builtinResolved = await resolveBuiltinModelAlias(model);
+  if (builtinResolved) {
+    return {
+      providerId: builtinResolved.providerId,
+      apiName: builtinResolved.apiName,
+    };
+  }
+
+  // Try direct provider::model format
+  const separatorIdx = model.indexOf("::");
+  if (separatorIdx !== -1) {
+    const providerId = model.slice(0, separatorIdx);
+    const apiName = model.slice(separatorIdx + 2);
+    if (providerId && apiName) {
+      return { providerId, apiName };
+    }
+  }
+
+  return null;
+}
 
 /**
  * Sanitizes external content before including it in LLM prompts.
@@ -325,7 +387,28 @@ export function registerThemesHandlers() {
   handle(
     "get-theme-generation-model-options",
     async (): Promise<ThemeGenerationModelOption[]> => {
-      return getThemeGenerationModelOptions();
+      const settings = readSettings();
+      const allProviders = await getLanguageModelProviders();
+      const options: ThemeGenerationModelOption[] = [];
+
+      for (const provider of allProviders) {
+        // Skip local providers (ollama, lmstudio) and Dyad Pro
+        if (provider.type === "local" || provider.id === "auto") continue;
+
+        // Only include providers that have credentials in settings
+        if (!isProviderConfiguredInSettings(provider.id, settings)) continue;
+
+        // Get all models for this provider (builtin + custom)
+        const models = await getLanguageModels({ providerId: provider.id });
+        for (const model of models) {
+          options.push({
+            id: `${provider.id}::${model.apiName}`,
+            label: `${provider.name} / ${model.displayName}`,
+          });
+        }
+      }
+
+      return options;
     },
   );
 
@@ -649,10 +732,10 @@ Modern dark theme with purple accents for testing.
       }
 
       // Validate and map model selection
-      const selectedModel = await resolveBuiltinModelAlias(params.model);
+      const selectedModel = await resolveModelParam(params.model);
       if (!selectedModel) {
         throw new Error(
-          `Invalid model selection: alias "${params.model}" could not be resolved`,
+          `Invalid model selection: "${params.model}" could not be resolved`,
         );
       }
 
@@ -827,10 +910,10 @@ Modern theme extracted from website for testing.
       }
 
       // Validate and map model selection
-      const selectedModel = await resolveBuiltinModelAlias(params.model);
+      const selectedModel = await resolveModelParam(params.model);
       if (!selectedModel) {
         throw new Error(
-          `Invalid model selection: alias "${params.model}" could not be resolved`,
+          `Invalid model selection: "${params.model}" could not be resolved`,
         );
       }
 

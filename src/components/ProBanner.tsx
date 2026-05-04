@@ -15,28 +15,7 @@ import { hasDyadProKey } from "@/lib/schemas";
 import { useSettings } from "@/hooks/useSettings";
 
 export function ProBanner() {
-  const { settings } = useSettings();
-
-  const [selectedBanner] = useState<"ai" | "smart" | "turbo">(() => {
-    const options = ["ai", "smart", "turbo"] as const;
-    return options[Math.floor(Math.random() * options.length)];
-  });
-
-  if (settings && hasDyadProKey(settings)) {
-    return null;
-  }
-
-  return (
-    <div className="mt-6 max-w-2xl mx-auto">
-      {selectedBanner === "ai" ? (
-        <AiAccessBanner />
-      ) : selectedBanner === "smart" ? (
-        <SmartContextBanner />
-      ) : (
-        <TurboBanner />
-      )}
-    </div>
-  );
+  return null;
 }
 
 export function ManageDyadProButton({ className }: { className?: string }) {

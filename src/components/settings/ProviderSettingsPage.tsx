@@ -343,7 +343,7 @@ export function ProviderSettingsPage({ provider }: ProviderSettingsPageProps) {
 
         {/* Conditionally render CustomModelsSection */}
         {supportsCustomModels && providerData && (
-          <ModelsSection providerId={providerData.id} />
+          <ModelsSection providerId={providerData.id} providerType={providerData.type} />
         )}
         <div className="h-24"></div>
       </div>

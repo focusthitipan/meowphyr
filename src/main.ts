@@ -1,5 +1,6 @@
 import {
   app,
+  autoUpdater,
   BrowserWindow,
   dialog,
   Menu,
@@ -268,21 +269,34 @@ export async function onReady() {
 
   logger.info("Auto-update enabled=", settings.enableAutoUpdate);
   if (settings.enableAutoUpdate) {
-    // Technically we could just pass the releaseChannel directly to the host,
-    // but this is more explicit and falls back to stable if there's an unknown
-    // release channel.
-    const postfix = settings.releaseChannel === "beta" ? "beta" : "stable";
-    const host = `https://api.dyad.sh/v1/update/${postfix}`;
-    logger.info("Auto-update release channel=", postfix);
+    const host = "https://update.electronjs.org";
+    const repo = "focusthitipan/dyad";
+    const isBeta = settings.releaseChannel === "beta";
+    logger.info(
+      `Auto-update from fork: ${repo} (channel: ${settings.releaseChannel ?? "stable"})`
+    );
     updateElectronApp({
       logger,
       updateInterval: "60 minutes",
       updateSource: {
         type: UpdateSourceType.ElectronPublicUpdateService,
-        repo: "dyad-sh/dyad",
+        repo,
         host,
       },
-    }); // additional configuration options available
+    });
+    if (isBeta) {
+      // update.electronjs.org only returns prerelease updates when the version
+      // in the feed URL contains a prerelease identifier. Override the feed URL
+      // so the server also considers beta/prerelease GitHub releases.
+      const platform = `${process.platform}-${process.arch}`;
+      const appVersion = app.getVersion();
+      const versionForFeed = appVersion.includes("-")
+        ? appVersion
+        : `${appVersion}-beta.0`;
+      const betaFeedUrl = `${host}/${repo}/${platform}/${versionForFeed}`;
+      logger.info("Beta channel feedURL:", betaFeedUrl);
+      autoUpdater.setFeedURL({ url: betaFeedUrl });
+    }
   }
 }
 

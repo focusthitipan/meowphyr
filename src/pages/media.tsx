@@ -21,7 +21,6 @@ export default function MediaPage() {
   const { apps: allApps } = useLoadApps();
   const [searchQuery, setSearchQuery] = useState("");
   const [imageGeneratorOpen, setImageGeneratorOpen] = useState(false);
-
   const filteredMediaApps = filterMediaAppsByQuery(mediaApps, searchQuery);
 
   return (

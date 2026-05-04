@@ -21,6 +21,7 @@ import {
 import { and, eq } from "drizzle-orm";
 import { IpcMainInvokeEvent } from "electron";
 import { DyadError, DyadErrorKind } from "@/errors/dyad_error";
+import { readSettings } from "@/main/settings";
 
 const logger = log.scope("language_model_handlers");
 const handle = createLoggedHandler(logger);
@@ -431,6 +432,114 @@ export function registerLanguageModelHandlers() {
     "get-language-models-by-providers",
     async (): Promise<Record<string, LanguageModel[]>> => {
       return getLanguageModelsByProviders();
+    },
+  );
+
+  handle(
+    "fetch-provider-model-list",
+    async (
+      _event: IpcMainInvokeEvent,
+      params: { providerId: string },
+    ): Promise<{ models: string[]; alreadyAdded: string[] }> => {
+      const { providerId } = params;
+
+      const providers = await getLanguageModelProviders();
+      const provider = providers.find((p) => p.id === providerId);
+
+      if (!provider || provider.type !== "custom") {
+        throw new DyadError(
+          `Provider "${providerId}" not found or is not a custom provider`,
+          DyadErrorKind.NotFound,
+        );
+      }
+
+      if (!provider.apiBaseUrl) {
+        throw new DyadError(
+          "Provider has no API base URL configured",
+          DyadErrorKind.Validation,
+        );
+      }
+
+      const settings = readSettings();
+      const apiKey = settings.providerSettings?.[providerId]?.apiKey?.value;
+      const envApiKey = provider.envVarName
+        ? process.env[provider.envVarName]
+        : undefined;
+      const effectiveApiKey = apiKey || envApiKey;
+
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (effectiveApiKey) {
+        headers["Authorization"] = `Bearer ${effectiveApiKey}`;
+      }
+
+      const baseUrl = provider.apiBaseUrl.replace(/\/$/, "");
+      const response = await fetch(`${baseUrl}/models`, { headers });
+
+      if (!response.ok) {
+        throw new DyadError(
+          `Failed to fetch models from provider: ${response.status} ${response.statusText}`,
+          DyadErrorKind.External,
+        );
+      }
+
+      const json = await response.json();
+      const modelData: Array<{ id: string }> = Array.isArray(json)
+        ? json
+        : (json.data ?? []);
+
+      const fetchedIds = modelData
+        .filter((m: any) => typeof m.id === "string" && m.id)
+        .map((m: any) => m.id as string);
+
+      const existingModels = await db
+        .select({ apiName: languageModelsSchema.apiName })
+        .from(languageModelsSchema)
+        .where(eq(languageModelsSchema.customProviderId, providerId));
+
+      const existingApiNames = new Set(existingModels.map((m) => m.apiName));
+      const alreadyAdded = fetchedIds.filter((id) => existingApiNames.has(id));
+      const models = fetchedIds.filter((id) => !existingApiNames.has(id));
+
+      return { models, alreadyAdded };
+    },
+  );
+
+  handle(
+    "import-selected-provider-models",
+    async (
+      _event: IpcMainInvokeEvent,
+      params: { providerId: string; modelIds: string[] },
+    ): Promise<{ added: number }> => {
+      const { providerId, modelIds } = params;
+
+      const providers = await getLanguageModelProviders();
+      const provider = providers.find((p) => p.id === providerId);
+
+      if (!provider || provider.type !== "custom") {
+        throw new DyadError(
+          `Provider "${providerId}" not found or is not a custom provider`,
+          DyadErrorKind.NotFound,
+        );
+      }
+
+      for (const modelId of modelIds) {
+        await db.insert(languageModelsSchema).values({
+          displayName: modelId,
+          apiName: modelId,
+          customProviderId: providerId,
+          description: null,
+          max_output_tokens: null,
+          context_window: null,
+        });
+      }
+
+      logger.info(
+        `Imported ${modelIds.length} selected models for provider "${providerId}"`,
+      );
+
+      return { added: modelIds.length };
     },
   );
 }

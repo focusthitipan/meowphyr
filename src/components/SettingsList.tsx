@@ -18,7 +18,6 @@ const SETTINGS_SECTIONS: SettingsSection[] = [
   { id: SECTION_IDS.workflow, label: "Workflow" },
   { id: SECTION_IDS.ai, label: "AI" },
   { id: SECTION_IDS.providers, label: "Model Providers" },
-  { id: SECTION_IDS.telemetry, label: "Telemetry" },
   { id: SECTION_IDS.integrations, label: "Integrations" },
   { id: SECTION_IDS.agentPermissions, label: "Agent Permissions" },
   { id: SECTION_IDS.toolsMcp, label: "Tools (MCP)" },

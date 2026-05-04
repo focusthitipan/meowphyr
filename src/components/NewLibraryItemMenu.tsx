@@ -1,4 +1,4 @@
-import { Palette, FileText, Plus, ChevronDown, ImagePlus } from "lucide-react";
+import { Palette, FileText, Plus, ChevronDown } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,11 +9,9 @@ import {
 export function NewLibraryItemMenu({
   onNewPrompt,
   onNewTheme,
-  onNewImage,
 }: {
   onNewPrompt: () => void;
   onNewTheme: () => void;
-  onNewImage: () => void;
 }) {
   return (
     <DropdownMenu>
@@ -31,10 +29,7 @@ export function NewLibraryItemMenu({
           <Palette className="mr-2 h-4 w-4" />
           New Theme
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={onNewImage}>
-          <ImagePlus className="mr-2 h-4 w-4" />
-          Generate Image
-        </DropdownMenuItem>
+
       </DropdownMenuContent>
     </DropdownMenu>
   );

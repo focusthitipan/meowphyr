@@ -17,9 +17,7 @@ export function useTrialModelRestriction() {
 
   // Auto-switch to auto model if user is on trial and not already on auto
   useEffect(() => {
-    if (isTrial && settings && !isOnAutoModel && !isLoadingUserBudget) {
-      updateSettings({ selectedModel: AUTO_MODEL });
-    }
+    // Auto-switching to Dyad Pro auto model is disabled
   }, [isTrial, isOnAutoModel, isLoadingUserBudget, settings, updateSettings]);
 
   return {

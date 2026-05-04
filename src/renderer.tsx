@@ -122,6 +122,9 @@ const posthogClient = posthog.init(
   },
 );
 
+// This fork disables telemetry collection entirely.
+posthogClient.opt_out_capturing();
+
 function App() {
   const queryClient = useQueryClient();
 
