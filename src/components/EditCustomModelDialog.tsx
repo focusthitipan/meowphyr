@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ipc } from "@/ipc/types";
 import { useSettings } from "@/hooks/useSettings";
 import { useMutation } from "@tanstack/react-query";
@@ -21,6 +22,7 @@ interface Model {
   description?: string;
   maxOutputTokens?: number;
   contextWindow?: number;
+  supportsVision?: boolean;
   type: "cloud" | "custom";
   tag?: string;
 }
@@ -45,6 +47,7 @@ export function EditCustomModelDialog({
   const [description, setDescription] = useState("");
   const [maxOutputTokens, setMaxOutputTokens] = useState<string>("");
   const [contextWindow, setContextWindow] = useState<string>("");
+  const [supportsVision, setSupportsVision] = useState(false);
   const { settings, updateSettings } = useSettings();
 
   useEffect(() => {
@@ -54,6 +57,7 @@ export function EditCustomModelDialog({
       setDescription(model.description || "");
       setMaxOutputTokens(model.maxOutputTokens?.toString() || "");
       setContextWindow(model.contextWindow?.toString() || "");
+      setSupportsVision(model.supportsVision ?? false);
     }
   }, [model]);
 
@@ -94,6 +98,7 @@ export function EditCustomModelDialog({
         description: newParams.description,
         maxOutputTokens: newParams.maxOutputTokens,
         contextWindow: newParams.contextWindow,
+        supportsVision,
       });
     },
     onSuccess: async () => {
@@ -223,6 +228,22 @@ export function EditCustomModelDialog({
                 placeholder="Optional: e.g., 8192"
                 disabled={mutation.isPending}
               />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-supports-vision" className="text-right">
+                Vision
+              </Label>
+              <div className="col-span-3 flex items-center gap-2">
+                <Checkbox
+                  id="edit-supports-vision"
+                  checked={supportsVision}
+                  onCheckedChange={(v) => setSupportsVision(!!v)}
+                  disabled={mutation.isPending}
+                />
+                <Label htmlFor="edit-supports-vision" className="font-normal text-muted-foreground">
+                  Model supports image input
+                </Label>
+              </div>
             </div>
           </div>
           <DialogFooter>

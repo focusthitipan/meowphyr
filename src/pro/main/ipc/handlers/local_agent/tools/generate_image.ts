@@ -9,12 +9,15 @@ import {
   escapeXmlAttr,
   escapeXmlContent,
 } from "./types";
-import { engineFetch } from "./engine_fetch";
 import { DYAD_MEDIA_DIR_NAME } from "@/ipc/utils/media_path_utils";
 import { ImageGenerationApiResponseSchema } from "@/ipc/types/image_generation";
 import { DyadError, DyadErrorKind } from "@/errors/dyad_error";
+import { readSettings } from "@/main/settings";
 
 const logger = log.scope("generate_image");
+
+const DEFAULT_IMAGE_GENERATION_BASE_URL = "https://api.openai.com/v1";
+const DEFAULT_IMAGE_GENERATION_MODEL = "gpt-image-1";
 
 const generateImageSchema = z.object({
   prompt: z
@@ -49,20 +52,33 @@ The tool returns the file path in .dyad/media. Use the copy_file tool to copy it
 
 async function callGenerateImage(
   prompt: string,
-  ctx: Pick<AgentContext, "dyadRequestId">,
 ): Promise<z.infer<typeof ImageGenerationApiResponseSchema>["data"][number]> {
-  const response = await engineFetch(ctx, "/images/generations", {
+  const settings = readSettings();
+  const apiKey = settings.imageGenerationApiKey;
+  const baseUrl =
+    settings.imageGenerationBaseUrl ?? DEFAULT_IMAGE_GENERATION_BASE_URL;
+  const model = settings.imageGenerationModel ?? DEFAULT_IMAGE_GENERATION_MODEL;
+
+  if (!apiKey) {
+    throw new DyadError(
+      "Image Generation API key is not configured. Please set it in Settings > Advanced > Image Generation.",
+      DyadErrorKind.Auth,
+    );
+  }
+
+  const response = await fetch(`${baseUrl}/images/generations`, {
     method: "POST",
-    body: JSON.stringify({
-      prompt,
-      model: "gpt-image-1.5",
-    }),
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({ prompt, model }),
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(
-      `Image generation failed: ${response.status} ${response.statusText} - ${errorText}`,
+    throw new DyadError(
+      `Image generation failed (HTTP ${response.status}). Please try again.`,
+      DyadErrorKind.External,
     );
   }
 
@@ -95,6 +111,10 @@ async function saveGeneratedImage(
     const buffer = Buffer.from(imageData.b64_json, "base64");
     await fs.writeFile(filePath, buffer);
   } else if (imageData.url) {
+    const imageUrl = new URL(imageData.url);
+    if (imageUrl.protocol !== "https:") {
+      throw new DyadError("Image URL must use HTTPS", DyadErrorKind.External);
+    }
     const response = await fetch(imageData.url);
     if (!response.ok) {
       throw new DyadError(
@@ -123,7 +143,10 @@ export const generateImageTool: ToolDefinition<
   defaultConsent: "always",
   modifiesState: true,
 
-  isEnabled: (ctx) => ctx.isDyadPro,
+  isEnabled: () => {
+    const settings = readSettings();
+    return !!settings.imageGenerationApiKey;
+  },
 
   getConsentPreview: (args) => `Generate image: "${args.prompt}"`,
 
@@ -141,7 +164,7 @@ export const generateImageTool: ToolDefinition<
     );
 
     try {
-      const imageData = await callGenerateImage(args.prompt, ctx);
+      const imageData = await callGenerateImage(args.prompt);
 
       const relativePath = await saveGeneratedImage(imageData, ctx.appPath);
 

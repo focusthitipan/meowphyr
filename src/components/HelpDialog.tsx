@@ -1,4 +1,4 @@
-import {
+﻿import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -20,9 +20,7 @@ import {
 import { type SystemDebugInfo } from "@/ipc/types";
 import { useSettings } from "@/hooks/useSettings";
 import { BugScreenshotDialog } from "./BugScreenshotDialog";
-import { useUserBudgetInfo } from "@/hooks/useUserBudgetInfo";
 import { type UserSettings } from "@/lib/schemas";
-import { type UserBudgetInfo } from "@/ipc/types/system";
 import { motion, AnimatePresence } from "framer-motion";
 
 // =============================================================================
@@ -63,7 +61,7 @@ function formatSettingsLines(settings: UserSettings | null): string {
     `- Selected Model: ${settings.selectedModel?.provider}:${settings.selectedModel?.name}`,
     `- Chat Mode: ${settings.selectedChatMode ?? "default"}`,
     `- Auto Approve Changes: ${settings.autoApproveChanges ?? "n/a"}`,
-    `- Dyad Pro Enabled: ${settings.enableDyadPro ?? "n/a"}`,
+    `- Meowphyr Pro Enabled: ${settings.enableDyadPro ?? "n/a"}`,
     `- Thinking Budget: ${settings.thinkingBudget ?? "n/a"}`,
     `- Runtime Mode: ${settings.runtimeMode2 ?? "n/a"}`,
     `- Release Channel: ${settings.releaseChannel ?? "n/a"}`,
@@ -72,18 +70,14 @@ function formatSettingsLines(settings: UserSettings | null): string {
   ].join("\n");
 }
 
-function formatSystemInfoSection(
-  debugInfo: SystemDebugInfo,
-  userBudget: UserBudgetInfo | undefined,
-): string {
+function formatSystemInfoSection(debugInfo: SystemDebugInfo): string {
   return `## System Information
-- Dyad Version: ${debugInfo.dyadVersion}
+- Meowphyr Version: ${debugInfo.dyadVersion}
 - Platform: ${debugInfo.platform}
 - Architecture: ${debugInfo.architecture}
 - Node Version: ${debugInfo.nodeVersion || "n/a"}
 - PNPM Version: ${debugInfo.pnpmVersion || "n/a"}
 - Node Path: ${debugInfo.nodePath || "n/a"}
-- Pro User ID: ${userBudget?.redactedUserId || "n/a"}
 - Telemetry ID: ${debugInfo.telemetryId || "n/a"}
 - Model: ${debugInfo.selectedLanguageModel || "n/a"}`;
 }
@@ -99,10 +93,8 @@ function openGitHubIssue(params: {
   title: string;
   labels: string[];
   body: string;
-  isDyadProUser: unknown;
 }) {
   const labels = [...params.labels];
-  if (params.isDyadProUser) labels.push("pro");
   const qs = new URLSearchParams({
     title: params.title,
     labels: labels.join(","),
@@ -163,9 +155,6 @@ export function HelpDialog({ isOpen, onClose }: HelpDialogProps) {
   const [isBugScreenshotOpen, setIsBugScreenshotOpen] = useState(false);
   const hasNavigated = useRef(false);
   const { settings } = useSettings();
-  const { userBudget } = useUserBudgetInfo();
-  const isDyadProUser = settings?.providerSettings?.["auto"]?.apiKey?.value;
-
   // ---------------------------------------------------------------------------
   // Navigation
   // ---------------------------------------------------------------------------
@@ -200,7 +189,7 @@ export function HelpDialog({ isOpen, onClose }: HelpDialogProps) {
 ## Screenshot (recommended)
 <!-- Screenshot of the bug -->
 
-${formatSystemInfoSection(debugInfo, userBudget ?? undefined)}
+${formatSystemInfoSection(debugInfo)}
 
 ## Settings
 ${formatSettingsLines(settings)}
@@ -211,7 +200,6 @@ ${formatLogsSection(debugInfo)}
         title: "[bug] <WRITE TITLE HERE>",
         labels: ["bug"],
         body,
-        isDyadProUser,
       });
     } catch (error) {
       console.error("Failed to prepare bug report:", error);
@@ -234,7 +222,7 @@ ${formatLogsSection(debugInfo)}
       skipInitial={!hasNavigated.current}
     >
       <DialogHeader>
-        <DialogTitle>Need help with Dyad?</DialogTitle>
+        <DialogTitle>Need help with Meowphyr?</DialogTitle>
       </DialogHeader>
       <DialogDescription>
         If you need help or want to report an issue, here are some options:
@@ -269,7 +257,7 @@ ${formatLogsSection(debugInfo)}
               <span className="text-sm font-semibold">Non-AI issues</span>
             </div>
             <p className="text-sm text-muted-foreground">
-              Includes error logs to troubleshoot non-AI issues with Dyad (UI
+              Includes error logs to troubleshoot non-AI issues with Meowphyr (UI
               bugs, crashes, setup problems, etc.).
             </p>
             <Button

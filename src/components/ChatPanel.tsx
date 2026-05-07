@@ -25,7 +25,6 @@ import { ArrowDown } from "lucide-react";
 import { useSettings } from "@/hooks/useSettings";
 import { useFreeAgentQuota } from "@/hooks/useFreeAgentQuota";
 import { useChatMode } from "@/hooks/useChatMode";
-import { isDyadProEnabled } from "@/lib/schemas";
 
 interface ChatPanelProps {
   chatId?: number;
@@ -48,11 +47,7 @@ export function ChatPanel({
   const { settings } = useSettings();
   const { selectedMode, setChatMode } = useChatMode(chatId);
   const { isQuotaExceeded } = useFreeAgentQuota();
-  const showFreeAgentQuotaBanner =
-    settings &&
-    !isDyadProEnabled(settings) &&
-    selectedMode === "local-agent" &&
-    isQuotaExceeded;
+  const showFreeAgentQuotaBanner = false;
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);

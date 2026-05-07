@@ -1,4 +1,4 @@
-import { readSettings } from "@/main/settings";
+﻿import { readSettings } from "@/main/settings";
 import { normalizePath } from "../../../shared/normalizePath";
 import { promises as fsPromises } from "node:fs";
 import path from "node:path";
@@ -136,7 +136,7 @@ function getDefaultStartCommand(): string {
 
 function getDefaultCloudSandboxErrorMessage(status: number): string {
   if (status === 401 || status === 403) {
-    return "Dyad couldn’t authorize the cloud sandbox request. Please try again.";
+    return "Meowphyr couldn’t authorize the cloud sandbox request. Please try again.";
   }
 
   if (status === 404) {
@@ -144,11 +144,11 @@ function getDefaultCloudSandboxErrorMessage(status: number): string {
   }
 
   if (status === 429) {
-    return "Dyad is rate limiting cloud sandbox requests right now. Please try again.";
+    return "Meowphyr is rate limiting cloud sandbox requests right now. Please try again.";
   }
 
   if (status >= 500) {
-    return "Dyad’s cloud sandbox service is temporarily unavailable. Please try again.";
+    return "Meowphyr’s cloud sandbox service is temporarily unavailable. Please try again.";
   }
 
   return `Cloud sandbox request failed with ${status}.`;
@@ -215,7 +215,7 @@ function getDyadEngineApiKey() {
   const apiKey = settings.providerSettings?.auto?.apiKey?.value;
 
   if (!apiKey && !IS_TEST_BUILD) {
-    throw new Error("Dyad Pro API key is required for cloud sandboxes.");
+    throw new Error("Meowphyr Pro API key is required for cloud sandboxes.");
   }
 
   return apiKey;

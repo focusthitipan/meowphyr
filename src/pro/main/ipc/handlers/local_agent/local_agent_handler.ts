@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Local Agent v2 Handler
  * Main orchestrator for tool-based agent mode with parallel execution
  */
@@ -19,7 +19,6 @@ import { chats, messages } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
 import {
-  isDyadProEnabled,
   isBasicAgentMode,
   type UserSettings,
 } from "@/lib/schemas";
@@ -361,25 +360,7 @@ export async function handleLocalAgentStream(
     await updateResponseInDb(placeholderMessageId, fullResponse);
   };
 
-  // Check Pro status or Basic Agent mode
-  // Basic Agent mode allows non-Pro users with quota (quota check is done in chat_stream_handlers)
-  // Read-only mode (ask mode) is allowed for all users without Pro
-  if (
-    !readOnly &&
-    !planModeOnly &&
-    !isDyadProEnabled(settings) &&
-    !isBasicAgentMode(settings)
-  ) {
-    const errorMessage =
-      referencedApps.length > 0
-        ? "Referencing other apps (@app:Name) in local-agent mode requires Dyad Pro. Please enable Dyad Pro in Settings → Pro."
-        : "Agent v2 requires Dyad Pro. Please enable Dyad Pro in Settings → Pro.";
-    safeSend(event.sender, "chat:response:error", {
-      chatId: req.chatId,
-      error: errorMessage,
-    });
-    return false;
-  }
+
 
   const loadChat = async () =>
     db.query.chats.findFirst({
@@ -567,7 +548,7 @@ export async function handleLocalAgentStream(
       todos: persistedTodos,
       dyadRequestId,
       fileEditTracker,
-      isDyadPro: isDyadProEnabled(settings),
+      isDyadPro: true,
       onXmlStream: (accumulatedXml: string) => {
         // Stream accumulated XML to UI without persisting
         streamingPreview = accumulatedXml;

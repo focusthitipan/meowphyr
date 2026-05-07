@@ -1,4 +1,4 @@
-import path from "node:path";
+﻿import path from "node:path";
 import os from "node:os";
 import fs from "node:fs";
 import { IS_TEST_BUILD } from "../ipc/utils/test_utils";
@@ -7,18 +7,18 @@ import { readSettings } from "../main/settings";
 // Cached result of getDyadAppsBaseDirectory
 let cachedBaseDirectory: string | null = null;
 let cachedCustomFolderSetting: string | null | undefined;
-// Whether `dyad-apps` has been created
+// Whether `meowphyr-apps` has been created
 let defaultDirCreated = false;
 
 /**
- * Gets the default path of the base dyad-apps directory (without a specific app subdirectory)
+ * Gets the default path of the base meowphyr-apps directory (without a specific app subdirectory)
  */
 export function getDefaultDyadAppsDirectory(): string {
   if (IS_TEST_BUILD) {
     const electron = getElectron();
-    return path.join(electron!.app.getPath("userData"), "dyad-apps");
+    return path.join(electron!.app.getPath("userData"), "meowphyr-apps");
   }
-  return path.join(os.homedir(), "dyad-apps");
+  return path.join(os.homedir(), "meowphyr-apps");
 }
 
 /**
@@ -33,7 +33,7 @@ function resolveDefaultDyadAppsDirectory(): string {
       defaultDirCreated = true;
     } catch {
       // Fall through; if it fails then the user will see error toasts
-      // when they try to do anything meaningful, but we don't want Dyad to crash
+      // when they try to do anything meaningful, but we don't want Meowphyr to crash
     }
   }
   return defaultDir;

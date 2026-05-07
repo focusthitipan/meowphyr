@@ -1,4 +1,4 @@
-import path from "path";
+﻿import path from "path";
 import fs from "fs-extra";
 import { app } from "electron";
 import { copyDirectoryRecursive } from "../utils/file_utils";
@@ -93,7 +93,7 @@ async function cloneRepo(repoUrl: string): Promise<string> {
       const response = await fetch(apiUrl, {
         method: "GET",
         headers: {
-          "User-Agent": "Dyad", // GitHub API requires this
+          "User-Agent": "Meowphyr", // GitHub API requires this
           Accept: "application/vnd.github.v3+json",
         },
       });

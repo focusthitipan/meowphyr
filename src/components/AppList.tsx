@@ -1,6 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { PlusCircle, Search } from "lucide-react";
-import { useAtomValue } from "jotai";
+import { useAtom } from "jotai";
 import { selectedAppIdAtom } from "@/atoms/appAtoms";
 import {
   SidebarGroup,
@@ -14,13 +14,27 @@ import { useOpenApp } from "@/hooks/useOpenApp";
 import { useMemo, useState } from "react";
 import { AppSearchDialog } from "./AppSearchDialog";
 import { AppItem } from "./appItem";
+import { RenameAppDialog } from "./RenameAppDialog";
+import { DeleteAppDialog } from "./DeleteAppDialog";
+import { ipc } from "@/ipc/types";
+import { showError, showSuccess } from "@/lib/toast";
+import type { ListedApp } from "@/ipc/types/app";
+
 export function AppList({ show }: { show?: boolean }) {
   const navigate = useNavigate();
-  const selectedAppId = useAtomValue(selectedAppIdAtom);
+  const [selectedAppId, setSelectedAppId] = useAtom(selectedAppIdAtom);
   const openApp = useOpenApp();
-  const { apps, loading, error } = useLoadApps();
+  const { apps, loading, error, refreshApps } = useLoadApps();
   // search dialog state
   const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
+
+  // Rename dialog state
+  const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
+  const [renameApp, setRenameApp] = useState<ListedApp | null>(null);
+
+  // Delete dialog state
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deleteApp, setDeleteApp] = useState<ListedApp | null>(null);
 
   const allApps = useMemo(
     () =>
@@ -56,6 +70,36 @@ export function AppList({ show }: { show?: boolean }) {
   const handleNewApp = () => {
     navigate({ to: "/" });
     // We'll eventually need a create app workflow
+  };
+
+  const handleRenameClick = (app: ListedApp) => {
+    setRenameApp(app);
+    setIsRenameDialogOpen(true);
+  };
+
+  const handleDeleteClick = (app: ListedApp) => {
+    setDeleteApp(app);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteApp) return;
+    try {
+      await ipc.app.deleteApp({ appId: deleteApp.id });
+      showSuccess("App deleted successfully");
+
+      if (selectedAppId === deleteApp.id) {
+        setSelectedAppId(null);
+        navigate({ to: "/" });
+      }
+
+      await refreshApps();
+    } catch (error) {
+      showError(`Failed to delete app: ${(error as any).toString()}`);
+    } finally {
+      setIsDeleteDialogOpen(false);
+      setDeleteApp(null);
+    }
   };
 
   return (
@@ -111,6 +155,8 @@ export function AppList({ show }: { show?: boolean }) {
                       app={app}
                       handleAppClick={handleAppClick}
                       selectedAppId={selectedAppId}
+                      onRenameClick={handleRenameClick}
+                      onDeleteClick={handleDeleteClick}
                     />
                   ))
                 )}
@@ -121,6 +167,8 @@ export function AppList({ show }: { show?: boolean }) {
                     app={app}
                     handleAppClick={handleAppClick}
                     selectedAppId={selectedAppId}
+                    onRenameClick={handleRenameClick}
+                    onDeleteClick={handleDeleteClick}
                   />
                 ))}
               </SidebarMenu>
@@ -128,11 +176,36 @@ export function AppList({ show }: { show?: boolean }) {
           </div>
         </SidebarGroupContent>
       </SidebarGroup>
+
       <AppSearchDialog
         open={isSearchDialogOpen}
         onOpenChange={setIsSearchDialogOpen}
         onSelectApp={handleAppClick}
         allApps={allApps}
+      />
+
+      {renameApp && (
+        <RenameAppDialog
+          appId={renameApp.id}
+          currentName={renameApp.name}
+          currentPath={renameApp.path}
+          isOpen={isRenameDialogOpen}
+          onOpenChange={(open) => {
+            setIsRenameDialogOpen(open);
+            if (!open) setRenameApp(null);
+          }}
+          onRename={refreshApps}
+        />
+      )}
+
+      <DeleteAppDialog
+        isOpen={isDeleteDialogOpen}
+        onOpenChange={(open) => {
+          setIsDeleteDialogOpen(open);
+          if (!open) setDeleteApp(null);
+        }}
+        onConfirmDelete={handleConfirmDelete}
+        appName={deleteApp?.name}
       />
     </>
   );

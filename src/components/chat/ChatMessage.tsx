@@ -16,6 +16,7 @@ import {
   Info,
   Bot,
   Ban,
+  Zap,
 } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import { useVersions } from "@/hooks/useVersions";
@@ -76,6 +77,39 @@ function stripAttachmentInfo(content: string): string {
   return content
     .replace(/<dyad-attachment\s+[^>]*><\/dyad-attachment>/g, "")
     .trim();
+}
+
+/** Extract skill badge slugs and remaining text from user message content. */
+function parseUserMessageParts(content: string): {
+  parts: Array<{ type: "text"; text: string } | { type: "skill"; name: string }>;
+} {
+  const parts: Array<{ type: "text"; text: string } | { type: "skill"; name: string }> = [];
+  const regex = /<dyad-skill\s+name="([^"]+)"\s*\/>/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(content)) !== null) {
+    if (match.index > lastIndex) {
+      const text = content.slice(lastIndex, match.index).trim();
+      if (text) parts.push({ type: "text", text });
+    }
+    parts.push({ type: "skill", name: match[1] });
+    lastIndex = match.index + match[0].length;
+  }
+
+  const remaining = content.slice(lastIndex).trim();
+  if (remaining) parts.push({ type: "text", text: remaining });
+
+  return { parts };
+}
+
+function SkillBadge({ name }: { name: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400">
+      <Zap size={10} />
+      {name}
+    </span>
+  );
 }
 
 interface ChatMessageProps {
@@ -203,7 +237,24 @@ const ChatMessage = ({
                     )}
                   </>
                 ) : (
-                  <VanillaMarkdownParser content={userTextContent} />
+                  (() => {
+                    const { parts } = parseUserMessageParts(userTextContent);
+                    const hasSkills = parts.some((p) => p.type === "skill");
+                    if (!hasSkills) {
+                      return <VanillaMarkdownParser content={userTextContent} />;
+                    }
+                    return (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {parts.map((part, i) =>
+                          part.type === "skill" ? (
+                            <SkillBadge key={i} name={part.name} />
+                          ) : (
+                            <VanillaMarkdownParser key={i} content={part.text} />
+                          ),
+                        )}
+                      </div>
+                    );
+                  })()
                 )}
               </div>
             )}

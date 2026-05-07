@@ -1,0 +1,1 @@
+ALTER TABLE `language_models` ADD `supports_vision` integer DEFAULT false;

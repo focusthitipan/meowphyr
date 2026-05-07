@@ -1,6 +1,5 @@
 import {
   getEffectiveDefaultChatMode,
-  isDyadProEnabled,
   type ChatMode,
   type UserSettings,
 } from "@/lib/schemas";
@@ -12,7 +11,6 @@ import {
 import { readSettings } from "@/main/settings";
 import { PROVIDER_TO_ENV_VAR } from "@/ipc/shared/language_model_constants";
 import { getEnvVar } from "@/ipc/utils/read_env";
-import { getFreeAgentQuotaStatus } from "./free_agent_quota_handlers";
 
 export { normalizeStoredChatMode };
 
@@ -80,23 +78,8 @@ function getChatModeEnvVars(): Record<string, string | undefined> {
 }
 
 async function getFreeAgentQuotaAvailableIfNeeded(
-  settings: UserSettings,
-  chatMode: ChatMode | null,
+  _settings: UserSettings,
+  _chatMode: ChatMode | null,
 ): Promise<boolean | undefined> {
-  if (isDyadProEnabled(settings)) {
-    return undefined;
-  }
-
-  const defaultMayUseLocalAgent =
-    !settings.defaultChatMode || settings.defaultChatMode === "local-agent";
-  const needsQuota =
-    chatMode === "local-agent" ||
-    (chatMode === null && defaultMayUseLocalAgent);
-
-  if (!needsQuota) {
-    return undefined;
-  }
-
-  const quotaStatus = await getFreeAgentQuotaStatus();
-  return !quotaStatus.isQuotaExceeded;
+  return undefined;
 }

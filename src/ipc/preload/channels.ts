@@ -28,7 +28,11 @@ import { systemContracts, systemEvents } from "../types/system";
 import { versionContracts } from "../types/version";
 import { languageModelContracts } from "../types/language-model";
 import { promptContracts } from "../types/prompts";
-import { templateContracts } from "../types/templates";
+import {
+  templateContracts,
+  themeGenerateStreamContract,
+  themeUrlGenerateStreamContract,
+} from "../types/templates";
 import { proposalContracts } from "../types/proposals";
 import { importContracts } from "../types/import";
 import { helpContracts, helpStreamContract } from "../types/help";
@@ -43,6 +47,8 @@ import { planEvents, planContracts } from "../types/plan";
 import { audioContracts } from "../types/audio";
 import { mediaContracts } from "../types/media";
 import { imageGenerationContracts } from "../types/image_generation";
+import { skillContracts } from "../types/skills";
+import { codeIndexContracts, codeIndexEvents } from "../types/code_index";
 
 // =============================================================================
 // Invoke Channels (derived from all contracts)
@@ -50,6 +56,12 @@ import { imageGenerationContracts } from "../types/image_generation";
 
 const CHAT_STREAM_CHANNELS = getStreamChannels(chatStreamContract);
 const HELP_STREAM_CHANNELS = getStreamChannels(helpStreamContract);
+const THEME_GENERATE_STREAM_CHANNELS = getStreamChannels(
+  themeGenerateStreamContract,
+);
+const THEME_URL_GENERATE_STREAM_CHANNELS = getStreamChannels(
+  themeUrlGenerateStreamContract,
+);
 
 // Test-only channels (handler only registered in E2E test builds, but channel always allowed)
 const TEST_INVOKE_CHANNELS = [
@@ -71,6 +83,8 @@ export const VALID_INVOKE_CHANNELS = [
   // Stream invoke channels
   CHAT_STREAM_CHANNELS.invoke,
   HELP_STREAM_CHANNELS.invoke,
+  THEME_GENERATE_STREAM_CHANNELS.invoke,
+  THEME_URL_GENERATE_STREAM_CHANNELS.invoke,
 
   // Integrations
   ...getInvokeChannels(githubContracts),
@@ -101,6 +115,8 @@ export const VALID_INVOKE_CHANNELS = [
   ...getInvokeChannels(audioContracts),
   ...getInvokeChannels(mediaContracts),
   ...getInvokeChannels(imageGenerationContracts),
+  ...getInvokeChannels(skillContracts),
+  ...getInvokeChannels(codeIndexContracts),
 
   // Test-only channels
   ...TEST_INVOKE_CHANNELS,
@@ -118,6 +134,8 @@ export const VALID_RECEIVE_CHANNELS = [
   // Stream receive channels
   ...CHAT_STREAM_CHANNELS.receive,
   ...HELP_STREAM_CHANNELS.receive,
+  ...THEME_GENERATE_STREAM_CHANNELS.receive,
+  ...THEME_URL_GENERATE_STREAM_CHANNELS.receive,
 
   // Event channels
   ...getReceiveChannels(agentEvents),
@@ -126,6 +144,7 @@ export const VALID_RECEIVE_CHANNELS = [
   ...getReceiveChannels(systemEvents),
   ...getReceiveChannels(miscEvents),
   ...getReceiveChannels(planEvents),
+  ...getReceiveChannels(codeIndexEvents),
 ] as const;
 
 // =============================================================================

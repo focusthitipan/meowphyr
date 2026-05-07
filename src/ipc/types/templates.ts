@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { defineContract, createClient } from "../contracts/core";
+import {
+  defineContract,
+  defineStream,
+  createClient,
+  createStreamClient,
+} from "../contracts/core";
 
 // =============================================================================
 // Template Schemas
@@ -99,6 +104,9 @@ export type ThemeGenerationModel = z.infer<typeof ThemeGenerationModelSchema>;
 export const ThemeGenerationModelOptionSchema = z.object({
   id: z.string(),
   label: z.string(),
+  providerId: z.string(),
+  providerName: z.string(),
+  supportsVision: z.boolean(),
 });
 export type ThemeGenerationModelOption = z.infer<
   typeof ThemeGenerationModelOptionSchema
@@ -178,6 +186,41 @@ export type CleanupThemeImagesParams = z.infer<
 >;
 
 // =============================================================================
+// Theme Generation Stream Schemas
+// =============================================================================
+
+export const ThemeGenerateStreamParamsSchema =
+  GenerateThemePromptParamsSchema.extend({
+    sessionId: z.string(),
+  });
+export type ThemeGenerateStreamParams = z.infer<
+  typeof ThemeGenerateStreamParamsSchema
+>;
+
+export const ThemeUrlGenerateStreamParamsSchema =
+  GenerateThemeFromUrlParamsSchema.extend({
+    sessionId: z.string(),
+  });
+export type ThemeUrlGenerateStreamParams = z.infer<
+  typeof ThemeUrlGenerateStreamParamsSchema
+>;
+
+export const ThemeStreamChunkSchema = z.object({
+  sessionId: z.string(),
+  delta: z.string(),
+  type: z.enum(["text", "status"]),
+});
+
+export const ThemeStreamEndSchema = z.object({
+  sessionId: z.string(),
+});
+
+export const ThemeStreamErrorSchema = z.object({
+  sessionId: z.string(),
+  error: z.string(),
+});
+
+// =============================================================================
 // Template/Theme Contracts
 // =============================================================================
 
@@ -237,17 +280,17 @@ export const templateContracts = {
     output: z.void(),
   }),
 
-  // Theme generation operations
+  // Theme generation operations (streaming — start returns ok, chunks come via events)
   generateThemePrompt: defineContract({
     channel: "generate-theme-prompt",
-    input: GenerateThemePromptParamsSchema,
-    output: GenerateThemePromptResultSchema,
+    input: ThemeGenerateStreamParamsSchema,
+    output: z.object({ ok: z.literal(true) }),
   }),
 
   generateThemeFromUrl: defineContract({
     channel: "generate-theme-from-url",
-    input: GenerateThemeFromUrlParamsSchema,
-    output: GenerateThemePromptResultSchema,
+    input: ThemeUrlGenerateStreamParamsSchema,
+    output: z.object({ ok: z.literal(true) }),
   }),
 
   saveThemeImage: defineContract({
@@ -264,7 +307,57 @@ export const templateContracts = {
 } as const;
 
 // =============================================================================
+// Theme Generation Stream Contracts
+// =============================================================================
+
+export const themeGenerateStreamContract = defineStream({
+  channel: "generate-theme-prompt",
+  input: ThemeGenerateStreamParamsSchema,
+  keyField: "sessionId",
+  events: {
+    chunk: {
+      channel: "theme:generate:chunk",
+      payload: ThemeStreamChunkSchema,
+    },
+    end: {
+      channel: "theme:generate:end",
+      payload: ThemeStreamEndSchema,
+    },
+    error: {
+      channel: "theme:generate:error",
+      payload: ThemeStreamErrorSchema,
+    },
+  },
+});
+
+export const themeUrlGenerateStreamContract = defineStream({
+  channel: "generate-theme-from-url",
+  input: ThemeUrlGenerateStreamParamsSchema,
+  keyField: "sessionId",
+  events: {
+    chunk: {
+      channel: "theme:url-generate:chunk",
+      payload: ThemeStreamChunkSchema,
+    },
+    end: {
+      channel: "theme:url-generate:end",
+      payload: ThemeStreamEndSchema,
+    },
+    error: {
+      channel: "theme:url-generate:error",
+      payload: ThemeStreamErrorSchema,
+    },
+  },
+});
+
+// =============================================================================
 // Template Client
 // =============================================================================
 
 export const templateClient = createClient(templateContracts);
+export const themeGenerateStreamClient = createStreamClient(
+  themeGenerateStreamContract,
+);
+export const themeUrlGenerateStreamClient = createStreamClient(
+  themeUrlGenerateStreamContract,
+);

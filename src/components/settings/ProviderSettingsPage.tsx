@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { ArrowLeft, AlertTriangle } from "lucide-react";
 import { useSettings } from "@/hooks/useSettings";
@@ -66,9 +66,9 @@ export function ProviderSettingsPage({ provider }: ProviderSettingsPageProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  // Use fetched data (or defaults for Dyad)
+  // Use fetched data (or defaults for Meowphyr)
   const providerDisplayName = isDyad
-    ? "Dyad"
+    ? "Meowphyr"
     : (providerData?.name ?? "Unknown Provider");
   const providerWebsiteUrl = providerData?.websiteUrl;
   const hasFreeTier = isDyad ? false : providerData?.hasFreeTier;
@@ -128,7 +128,7 @@ export function ProviderSettingsPage({ provider }: ProviderSettingsPageProps) {
     setIsSaving(true);
     setSaveError(null);
     try {
-      // Check if this is the first time user is setting up Dyad Pro
+      // Check if this is the first time user is setting up Meowphyr Pro
       const isNewDyadProSetup = isDyad && settings && !hasDyadProKey(settings);
 
       const settingsUpdate: Partial<UserSettings> = {
@@ -152,10 +152,6 @@ export function ProviderSettingsPage({ provider }: ProviderSettingsPageProps) {
       await updateSettings(settingsUpdate);
       setApiKeyInput(""); // Clear input on success
 
-      // Refetch user budget when Dyad Pro key is saved
-      if (isDyad) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.userBudget.info });
-      }
     } catch (error: any) {
       console.error("Error saving API key:", error);
       setSaveError(error.message || "Failed to save API key.");
@@ -187,7 +183,7 @@ export function ProviderSettingsPage({ provider }: ProviderSettingsPageProps) {
     }
   };
 
-  // --- Toggle Dyad Pro Handler ---
+  // --- Toggle Meowphyr Pro Handler ---
   const handleToggleDyadPro = async (enabled: boolean) => {
     setIsSaving(true);
     try {
@@ -195,7 +191,7 @@ export function ProviderSettingsPage({ provider }: ProviderSettingsPageProps) {
         enableDyadPro: enabled,
       });
     } catch (error: any) {
-      showError(`Error toggling Dyad Pro: ${error}`);
+      showError(`Error toggling Meowphyr Pro: ${error}`);
     } finally {
       setIsSaving(false);
     }
@@ -327,13 +323,13 @@ export function ProviderSettingsPage({ provider }: ProviderSettingsPageProps) {
         {isDyad && !settingsLoading && (
           <div className="mt-6 flex items-center justify-between p-4 bg-(--background-lightest) rounded-lg border">
             <div>
-              <h3 className="font-medium">Enable Dyad Pro</h3>
+              <h3 className="font-medium">Enable Meowphyr Pro</h3>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                Toggle to enable Dyad Pro
+                Toggle to enable Meowphyr Pro
               </p>
             </div>
             <Switch
-              aria-label="Enable Dyad Pro"
+              aria-label="Enable Meowphyr Pro"
               checked={settings?.enableDyadPro}
               onCheckedChange={handleToggleDyadPro}
               disabled={isSaving}

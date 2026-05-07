@@ -1,17 +1,17 @@
-import path from "node:path";
+﻿import path from "node:path";
 
 /**
- * The root ".dyad" directory within each app that holds Dyad-managed files.
+ * The root ".meowphyr" directory within each app that holds Meowphyr-managed files.
  */
-export const DYAD_INTERNAL_DIR_NAME = ".dyad";
+export const DYAD_INTERNAL_DIR_NAME = ".meowphyr";
 
 /**
- * The ".dyad"-relative subdir for uploaded media files.
+ * The ".meowphyr"-relative subdir for uploaded media files.
  */
 export const DYAD_MEDIA_SUBDIR = "media";
 
 /**
- * The ".dyad"-relative subdir for screenshot files.
+ * The ".meowphyr"-relative subdir for screenshot files.
  */
 export const DYAD_SCREENSHOT_SUBDIR = "screenshot";
 
@@ -52,9 +52,9 @@ export function isWithinDyadMediaDir(
 }
 
 /**
- * Check if an absolute path is a file inside a .dyad/media directory
+ * Check if an absolute path is a file inside a .meowphyr/media directory
  * (without requiring a known app path). Validates by finding consecutive
- * ".dyad" + "media" path segments with at least one segment (filename) after,
+ * ".meowphyr" + "media" path segments with at least one segment (filename) after,
  * then confirms the resolved path doesn't escape via ".." traversal.
  */
 export function isFileWithinAnyDyadMediaDir(absPath: string): boolean {
@@ -63,7 +63,7 @@ export function isFileWithinAnyDyadMediaDir(absPath: string): boolean {
 
   let mediaIdx = -1;
   for (let i = 0; i < segments.length - 2; i++) {
-    if (segments[i] === ".dyad" && segments[i + 1] === "media") {
+    if (segments[i] === DYAD_INTERNAL_DIR_NAME && segments[i + 1] === DYAD_MEDIA_SUBDIR) {
       mediaIdx = i + 1;
       break;
     }

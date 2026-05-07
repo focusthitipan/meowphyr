@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+﻿import { useCallback } from "react";
 import type {
   ComponentSelection,
   FileAttachment,
@@ -29,7 +29,6 @@ import { showExtraFilesToast, showWarning } from "@/lib/toast";
 import { useSearch } from "@tanstack/react-router";
 import { useRunApp } from "./useRunApp";
 import { useCountTokens } from "./useCountTokens";
-import { useUserBudgetInfo } from "./useUserBudgetInfo";
 import { usePostHog } from "posthog-js/react";
 
 import { useSettings } from "./useSettings";
@@ -62,7 +61,6 @@ export function useStreamChat({
   const setStreamCountById = useSetAtom(chatStreamCountByIdAtom);
   const { refreshVersions } = useVersions(selectedAppId);
   const { refreshAppIframe } = useRunApp();
-  const { refetchUserBudget } = useUserBudgetInfo();
   const setPendingScreenshotAppId = useSetAtom(pendingScreenshotAppIdAtom);
   const { settings } = useSettings();
   const setRecentStreamChatIds = useSetAtom(recentStreamChatIdsAtom);
@@ -332,7 +330,7 @@ export function useStreamChat({
                     queryKeys.chats.list({ appId: targetAppId ?? null }),
                   );
                   const chat = chats?.find((c) => c.id === chatId);
-                  const appName = app?.name ?? "Dyad";
+                  const appName = app?.name ?? "Meowphyr";
                   const rawTitle = response.chatSummary ?? chat?.title;
                   const body = rawTitle
                     ? rawTitle.length > 80
@@ -374,8 +372,6 @@ export function useStreamChat({
                 queryClient.invalidateQueries({
                   queryKey: ["proposal", chatId],
                 });
-
-                refetchUserBudget();
 
                 // Invalidate free agent quota to update the UI after message
                 queryClient.invalidateQueries({
@@ -497,7 +493,6 @@ export function useStreamChat({
       setStreamCompletedSuccessfullyById,
       setQueuePausedById,
       selectedAppId,
-      refetchUserBudget,
       settings,
       queryClient,
     ],

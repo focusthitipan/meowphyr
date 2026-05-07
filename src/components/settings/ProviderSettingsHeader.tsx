@@ -1,4 +1,4 @@
-import {
+﻿import {
   ArrowLeft,
   ArrowUp,
   Circle,
@@ -35,8 +35,8 @@ function getKeyButtonText({
 }) {
   if (isDyad) {
     return isConfigured
-      ? "Manage Dyad Pro Subscription"
-      : "Setup Dyad Pro Subscription";
+      ? "Manage Meowphyr Pro Subscription"
+      : "Setup Meowphyr Pro Subscription";
   }
   return isConfigured ? "Manage API Keys" : "Setup API Key";
 }

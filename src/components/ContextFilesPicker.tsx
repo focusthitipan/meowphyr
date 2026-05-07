@@ -19,7 +19,7 @@ import {
 } from "./ui/tooltip";
 import { useSettings } from "@/hooks/useSettings";
 import { useContextPaths } from "@/hooks/useContextPaths";
-import { isDyadProEnabled, type ContextPathResult } from "@/lib/schemas";
+import type { ContextPathResult } from "@/lib/schemas";
 
 export function ContextFilesPicker() {
   const { settings } = useSettings();
@@ -115,9 +115,7 @@ export function ContextFilesPicker() {
     updateExcludePaths(newPaths);
   };
 
-  const isSmartContextEnabled =
-    (settings ? isDyadProEnabled(settings) : false) &&
-    settings?.enableProSmartFilesContextMode;
+  const isSmartContextEnabled = settings?.enableProSmartFilesContextMode;
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -146,11 +144,11 @@ export function ContextFilesPicker() {
                   <TooltipContent className="max-w-[300px]">
                     {isSmartContextEnabled ? (
                       <p>
-                        With Smart Context, Dyad uses the most relevant files as
+                        With Smart Context, Meowphyr uses the most relevant files as
                         context.
                       </p>
                     ) : (
-                      <p>By default, Dyad uses your whole codebase.</p>
+                      <p>By default, Meowphyr uses your whole codebase.</p>
                     )}
                   </TooltipContent>
                 </Tooltip>
@@ -219,8 +217,8 @@ export function ContextFilesPicker() {
               <div className="rounded-md border border-dashed p-4 text-center">
                 <p className="text-sm text-muted-foreground">
                   {isSmartContextEnabled
-                    ? "Dyad will use Smart Context to automatically find the most relevant files to use as context."
-                    : "Dyad will use the entire codebase as context."}
+                    ? "Meowphyr will use Smart Context to automatically find the most relevant files to use as context."
+                    : "Meowphyr will use the entire codebase as context."}
                 </p>
               </div>
             )}

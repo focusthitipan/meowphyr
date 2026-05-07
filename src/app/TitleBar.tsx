@@ -1,11 +1,10 @@
-import { useAtom, useAtomValue } from "jotai";
+﻿import { useAtom, useAtomValue } from "jotai";
 import { selectedAppIdAtom } from "@/atoms/appAtoms";
 import { useLoadApps } from "@/hooks/useLoadApps";
 import { useRouter } from "@tanstack/react-router";
 import { useSettings } from "@/hooks/useSettings";
 import { Button } from "@/components/ui/button";
-// @ts-ignore
-import logo from "../../assets/logo.svg";
+import logo from "../../assets/logo.png";
 import { providerSettingsRoute } from "@/routes/settings/providers/$provider";
 import { cn } from "@/lib/utils";
 import { useDeepLink } from "@/contexts/DeepLinkContext";
@@ -14,8 +13,6 @@ import { DyadProSuccessDialog } from "@/components/DyadProSuccessDialog";
 import { useTheme } from "@/contexts/ThemeContext";
 import { ipc } from "@/ipc/types";
 import { useSystemPlatform } from "@/hooks/useSystemPlatform";
-import { useUserBudgetInfo } from "@/hooks/useUserBudgetInfo";
-import type { UserBudgetInfo } from "@/ipc/types";
 import {
   Tooltip,
   TooltipContent,
@@ -33,9 +30,7 @@ import {
 import { useRunApp } from "@/hooks/useRunApp";
 import { showError, showSuccess } from "@/lib/toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { queryKeys } from "@/lib/queryKeys";
 import { useTranslation } from "react-i18next";
-import { isDyadProEnabled } from "@/lib/schemas";
 
 export const TitleBar = () => {
   const [selectedAppId] = useAtom(selectedAppIdAtom);
@@ -57,8 +52,6 @@ export const TitleBar = () => {
     const handleDeepLink = async () => {
       if (lastDeepLink?.type === "dyad-pro-return") {
         await refreshSettings();
-        // Refetch user budget when Dyad Pro key is set via deep link
-        queryClient.invalidateQueries({ queryKey: queryKeys.userBudget.info });
         showDyadProSuccessDialog();
         clearLastDeepLink();
       }
@@ -78,15 +71,12 @@ export const TitleBar = () => {
     }
   };
 
-  const isDyadPro = !!settings?.providerSettings?.auto?.apiKey?.value;
-  const isDyadProFeatureEnabled = settings ? isDyadProEnabled(settings) : false;
-
   return (
     <>
       <div className="@container z-11 w-full h-11 pt-3 bg-(--sidebar) absolute top-0 left-0 app-region-drag flex items-center">
         <div className={`${showWindowControls ? "pl-2" : "pl-18"}`}></div>
 
-        <img src={logo} alt="Dyad Logo" className="w-6 h-6 mr-0.5 ml-2" />
+        <img src={logo} alt="Meowphyr Logo" className="w-6 h-6 mr-0.5 ml-2" />
         <Tooltip>
           <TooltipTrigger
             render={
@@ -107,10 +97,6 @@ export const TitleBar = () => {
             {selectedApp ? selectedApp.name : "No app selected"}
           </TooltipContent>
         </Tooltip>
-        {isDyadPro && (
-          <DyadProButton isDyadProEnabled={isDyadProFeatureEnabled} />
-        )}
-
         <div className="flex-1 min-w-0 overflow-hidden no-app-region-drag">
           <ChatTabs selectedChatId={selectedChatId} />
         </div>
@@ -292,59 +278,3 @@ function TitleBarActions() {
   );
 }
 
-export function DyadProButton({
-  isDyadProEnabled,
-}: {
-  isDyadProEnabled: boolean;
-}) {
-  const { navigate } = useRouter();
-  const { userBudget } = useUserBudgetInfo();
-  return (
-    <Button
-      data-testid="title-bar-dyad-pro-button"
-      onClick={() => {
-        navigate({
-          to: providerSettingsRoute.id,
-          params: { provider: "auto" },
-        });
-      }}
-      variant="outline"
-      className={cn(
-        "hidden @2xl:block ml-1 no-app-region-drag h-7 bg-indigo-600 text-white dark:bg-indigo-600 dark:text-white text-xs px-2 pt-1 pb-1",
-        !isDyadProEnabled && "bg-zinc-600 dark:bg-zinc-600",
-      )}
-      size="sm"
-    >
-      {isDyadProEnabled
-        ? userBudget?.isTrial
-          ? "Pro Trial"
-          : "Pro"
-        : "Pro (off)"}
-      {userBudget && isDyadProEnabled && (
-        <AICreditStatus userBudget={userBudget} />
-      )}
-    </Button>
-  );
-}
-
-export function AICreditStatus({
-  userBudget,
-}: {
-  userBudget: NonNullable<UserBudgetInfo>;
-}) {
-  const remaining = Math.round(
-    userBudget.totalCredits - userBudget.usedCredits,
-  );
-  return (
-    <Tooltip>
-      <TooltipTrigger>
-        <div className="text-xs pl-1 mt-0.5">{remaining} credits</div>
-      </TooltipTrigger>
-      <TooltipContent>
-        <div>
-          <p>Note: there is a slight delay in updating the credit status.</p>
-        </div>
-      </TooltipContent>
-    </Tooltip>
-  );
-}

@@ -2,7 +2,6 @@ import { isOpenAIOrAnthropicSetup } from "./providerUtils";
 import {
   getEffectiveDefaultChatMode,
   hasDyadProKey,
-  isDyadProEnabled,
   migrateStoredChatMode,
   StoredChatModeSchema,
   type ChatMode,
@@ -49,23 +48,7 @@ export function getUnavailableChatModeReason({
     return undefined;
   }
 
-  if (isDyadProEnabled(settings)) {
-    return undefined;
-  }
-
-  if (isOpenAIOrAnthropicSetup(settings, envVars)) {
-    if (freeAgentQuotaAvailable === false) {
-      return "quota-exhausted";
-    }
-
-    return undefined;
-  }
-
-  if (settings.enableDyadPro === true && !hasDyadProKey(settings)) {
-    return "pro-required";
-  }
-
-  return "no-provider";
+  return undefined;
 }
 
 export function resolveChatMode({

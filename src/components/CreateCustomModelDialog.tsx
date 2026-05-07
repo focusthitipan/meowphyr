@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ipc } from "@/ipc/types";
 import { useMutation } from "@tanstack/react-query";
 import { showError, showSuccess } from "@/lib/toast";
@@ -32,6 +33,7 @@ export function CreateCustomModelDialog({
   const [description, setDescription] = useState("");
   const [maxOutputTokens, setMaxOutputTokens] = useState<string>("");
   const [contextWindow, setContextWindow] = useState<string>("");
+  const [supportsVision, setSupportsVision] = useState(false);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -61,6 +63,7 @@ export function CreateCustomModelDialog({
         description: params.description,
         maxOutputTokens: params.maxOutputTokens,
         contextWindow: params.contextWindow,
+        supportsVision,
       });
     },
     onSuccess: () => {
@@ -80,6 +83,7 @@ export function CreateCustomModelDialog({
     setDescription("");
     setMaxOutputTokens("");
     setContextWindow("");
+    setSupportsVision(false);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -183,6 +187,22 @@ export function CreateCustomModelDialog({
                 placeholder="Optional: e.g., 8192"
                 disabled={mutation.isPending}
               />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="supports-vision" className="text-right">
+                Vision
+              </Label>
+              <div className="col-span-3 flex items-center gap-2">
+                <Checkbox
+                  id="supports-vision"
+                  checked={supportsVision}
+                  onCheckedChange={(v) => setSupportsVision(!!v)}
+                  disabled={mutation.isPending}
+                />
+                <Label htmlFor="supports-vision" className="font-normal text-muted-foreground">
+                  Model supports image input
+                </Label>
+              </div>
             </div>
           </div>
           <DialogFooter>

@@ -1,10 +1,10 @@
-import { useState, useCallback } from "react";
+﻿import { useState, useCallback } from "react";
 import { useSettings } from "@/hooks/useSettings";
 import { detectIsMac } from "@/hooks/useChatModeToggle";
 
 function sendTestNotification() {
   if (Notification.permission === "granted") {
-    new Notification("Dyad", {
+    new Notification("Meowphyr", {
       body: "Notifications are working! You'll be notified when responses finish or input is needed.",
     });
   }

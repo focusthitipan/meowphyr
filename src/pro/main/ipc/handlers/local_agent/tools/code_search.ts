@@ -1,100 +1,31 @@
 import { z } from "zod";
 import log from "electron-log";
-import {
-  ToolDefinition,
-  AgentContext,
-  escapeXmlAttr,
-  escapeXmlContent,
-} from "./types";
-import { extractCodebase } from "../../../../../../utils/codebase";
-import { engineFetch } from "./engine_fetch";
+import { ToolDefinition, AgentContext, escapeXmlAttr, escapeXmlContent } from "./types";
+import { readSettings } from "@/main/settings";
 import { DyadError, DyadErrorKind } from "@/errors/dyad_error";
-import {
-  filterDyadInternalFiles,
-  resolveTargetAppPath,
-} from "./resolve_app_context";
+import { getEmbedding } from "../indexing/embeddings";
+import { searchVectors, getChunkCount } from "../indexing/vector_store";
+import { indexCodebase } from "../indexing/codebase_indexer";
 
 const logger = log.scope("code_search");
 
 const codeSearchSchema = z.object({
   query: z.string().describe("Search query to find relevant files"),
-  app_name: z
-    .string()
-    .optional()
-    .describe(
-      "Optional. Name of a referenced app (from `@app:Name` mentions in the user's prompt) to search in instead of the current app. Omit to search the current app.",
-    ),
-});
-
-const FileContextSchema = z.object({
-  path: z.string(),
-  content: z.string(),
-});
-
-const codeSearchResponseSchema = z.object({
-  relevantFiles: z.array(z.string()).describe("Paths of relevant files"),
 });
 
 type CodeSearchArgs = z.infer<typeof codeSearchSchema>;
 
-function buildCodeSearchAttributes(args: Partial<CodeSearchArgs>) {
-  const queryAttr = args.query ? ` query="${escapeXmlAttr(args.query)}"` : "";
-  const appNameAttr = args.app_name
-    ? ` app_name="${escapeXmlAttr(args.app_name)}"`
-    : "";
-  return `${queryAttr}${appNameAttr}`;
-}
-
-async function callCodeSearch(
-  params: {
-    query: string;
-    app_name?: string;
-    filesContext: z.infer<typeof FileContextSchema>[];
-  },
-  ctx: AgentContext,
-): Promise<string[]> {
-  // Stream initial state to UI
-  ctx.onXmlStream(
-    `<dyad-code-search${buildCodeSearchAttributes({
-      query: params.query,
-      app_name: params.app_name,
-    })}>`,
-  );
-
-  const response = await engineFetch(ctx, "/tools/code-search", {
-    method: "POST",
-    body: JSON.stringify({
-      query: params.query,
-      filesContext: params.filesContext,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new DyadError(
-      `Code search failed: ${response.status} ${response.statusText} - ${errorText}`,
-      DyadErrorKind.External,
-    );
-  }
-
-  const data = codeSearchResponseSchema.parse(await response.json());
-  return data.relevantFiles;
-}
-
-const DESCRIPTION = `Search the codebase semantically to find files relevant to a query. Use this tool when you need to discover which files contain code related to a specific concept, feature, or functionality. Returns a list of file paths that are most relevant to the search query.
+const DESCRIPTION = `Search the codebase semantically to find code relevant to a query. Use this tool when you need to discover code related to a specific concept, feature, or functionality. Returns the most relevant code chunks with their file paths and line numbers.
 
 ### When to Use This Tool
-
 - Explore unfamiliar codebases
 - Ask "how / where / what" questions to understand behavior
 - Find code by meaning rather than exact text
 
 ### When NOT to Use
-
-Skip this tool for:
-1. Exact text matches (use \`grep\`)
-2. Reading known files (use \`read_file\`)
-3. Simple symbol lookups (use \`grep\`)
+- Exact text matches (use \`grep\`)
+- Reading known files (use \`read_file\`)
+- Simple symbol lookups (use \`grep\`)
 `;
 
 export const codeSearchTool: ToolDefinition<CodeSearchArgs> = {
@@ -103,73 +34,68 @@ export const codeSearchTool: ToolDefinition<CodeSearchArgs> = {
   inputSchema: codeSearchSchema,
   defaultConsent: "always",
 
-  // Requires Dyad Pro engine API
-  isEnabled: (ctx) => ctx.isDyadPro,
+  isEnabled: () => {
+    const settings = readSettings();
+    return !!settings.embeddingApiKey;
+  },
 
-  getConsentPreview: (args) =>
-    args.app_name
-      ? `Search for "${args.query}" (app: ${args.app_name})`
-      : `Search for "${args.query}"`,
+  getConsentPreview: (args) => `Search for "${args.query}"`,
 
   buildXml: (args, isComplete) => {
     if (!args.query) return undefined;
     if (isComplete) return undefined;
-    return `<dyad-code-search${buildCodeSearchAttributes(args)}>Searching...`;
+    return `<dyad-code-search query="${escapeXmlAttr(args.query)}">`;
   },
 
   execute: async (args, ctx: AgentContext) => {
-    logger.log(`Executing code search: ${args.query}`);
-    const targetAppPath = resolveTargetAppPath(ctx, args.app_name);
+    logger.log(`Code search: "${args.query}"`);
 
-    // Gather all files from the project
-    const { files } = await extractCodebase({
-      appPath: targetAppPath,
-      chatContext: {
-        contextPaths: [],
-        smartContextAutoIncludes: [],
-        excludePaths: [],
-      },
-    });
+    ctx.onXmlStream(`<dyad-code-search query="${escapeXmlAttr(args.query)}">`);
 
-    const filteredFiles = filterDyadInternalFiles(files, args.app_name);
+    try {
+      // Build/update index if needed
+      const chunkCount = getChunkCount(ctx.appId);
+      if (chunkCount === 0) {
+        logger.log("No index found, building...");
+        ctx.onWarningMessage?.("Building code search index for this app, this may take a moment...");
+        await indexCodebase(ctx.appId, ctx.appPath);
+      }
 
-    // Map files to FileContext format
-    const filesContext = filteredFiles.map((file) => ({
-      path: file.path,
-      content: file.content,
-    }));
+      // Embed the query and search
+      const queryEmbedding = await getEmbedding(args.query);
+      const searchSettings = readSettings();
+      const results = searchVectors(
+        ctx.appId,
+        queryEmbedding,
+        searchSettings.embeddingSearchMaxResults ?? 50,
+        searchSettings.embeddingSearchMinScore ?? 0.4,
+      );
 
-    logger.log(
-      `Searching ${filesContext.length} files for query: "${args.query}"`,
-    );
+      if (results.length === 0) {
+        ctx.onXmlComplete(`<dyad-code-search query="${escapeXmlAttr(args.query)}"></dyad-code-search>`);
+        return "No relevant files found for this query.";
+      }
 
-    // Call the code-search endpoint
-    const relevantFiles = await callCodeSearch(
-      {
-        query: args.query,
-        app_name: args.app_name,
-        filesContext,
-      },
-      ctx,
-    );
+      const resultText = results
+        .map(
+          (r, i) =>
+            `${i + 1}. ${r.relativePath} (lines ${r.startLine}-${r.endLine})\n\`\`\`\n${r.chunkText}\n\`\`\``,
+        )
+        .join("\n\n");
 
-    // Format results
-    const resultText =
-      relevantFiles.length === 0
-        ? "No relevant files found."
-        : relevantFiles.map((f) => ` - ${f}`).join("\n");
+      ctx.onXmlComplete(
+        `<dyad-code-search query="${escapeXmlAttr(args.query)}">${escapeXmlContent(resultText)}</dyad-code-search>`,
+      );
 
-    // Write final result to UI and DB with dyad-code-search wrapper
-    ctx.onXmlComplete(
-      `<dyad-code-search${buildCodeSearchAttributes(args)}>${escapeXmlContent(resultText)}</dyad-code-search>`,
-    );
-
-    logger.log(`Code search completed for query: ${args.query}`);
-
-    if (relevantFiles.length === 0) {
-      return "No relevant files found for the given query.";
+      logger.log(`Found ${results.length} relevant code chunks`);
+      return `Relevant code chunks:\n\n${resultText}`;
+    } catch (error) {
+      ctx.onXmlComplete(`<dyad-code-search query="${escapeXmlAttr(args.query)}"></dyad-code-search>`);
+      if (error instanceof DyadError) throw error;
+      throw new DyadError(
+        `Code search failed: ${error instanceof Error ? error.message : String(error)}`,
+        DyadErrorKind.External,
+      );
     }
-
-    return `Found ${relevantFiles.length} relevant file(s):\n${resultText}`;
   },
 };

@@ -523,19 +523,19 @@ line 5`;
       ).rejects.toThrow("File does not exist: missing.txt (in app: other-app)");
     });
 
-    it("blocks .dyad/ paths when targeting a referenced app", async () => {
+    it("blocks .meowphyr/ paths when targeting a referenced app", async () => {
       mockContext.referencedApps.set("other-app", otherAppDir);
       await expect(
         readFileTool.execute(
-          { path: ".dyad/chats/secret.md", app_name: "other-app" },
+          { path: ".meowphyr/chats/secret.md", app_name: "other-app" },
           mockContext,
         ),
-      ).rejects.toThrow(/Cannot read \.dyad\/ paths from referenced apps/);
+      ).rejects.toThrow(/Cannot read \.meowphyr\/ paths from referenced apps/);
     });
 
-    it("blocks .dyad/ paths reached via traversal aliases (e.g. src/../.dyad/...)", async () => {
+    it("blocks .meowphyr/ paths reached via traversal aliases (e.g. src/../.meowphyr/...)", async () => {
       mockContext.referencedApps.set("other-app", otherAppDir);
-      const dyadDir = path.join(otherAppDir, ".dyad");
+      const dyadDir = path.join(otherAppDir, ".meowphyr");
       await fs.promises.mkdir(dyadDir, { recursive: true });
       await fs.promises.writeFile(
         path.join(dyadDir, "secret.md"),
@@ -547,21 +547,21 @@ line 5`;
 
       await expect(
         readFileTool.execute(
-          { path: "src/../.dyad/secret.md", app_name: "other-app" },
+          { path: "src/../.meowphyr/secret.md", app_name: "other-app" },
           mockContext,
         ),
-      ).rejects.toThrow(/Cannot read \.dyad\/ paths from referenced apps/);
+      ).rejects.toThrow(/Cannot read \.meowphyr\/ paths from referenced apps/);
     });
 
-    it("allows .dyad/ paths on the current app (no app_name)", async () => {
-      const dyadDir = path.join(testDir, ".dyad");
+    it("allows .meowphyr/ paths on the current app (no app_name)", async () => {
+      const dyadDir = path.join(testDir, ".meowphyr");
       await fs.promises.mkdir(dyadDir, { recursive: true });
       await fs.promises.writeFile(
         path.join(dyadDir, "notes.md"),
         "local dyad metadata",
       );
       const result = await readFileTool.execute(
-        { path: ".dyad/notes.md" },
+        { path: ".meowphyr/notes.md" },
         mockContext,
       );
       expect(result).toBe("local dyad metadata");

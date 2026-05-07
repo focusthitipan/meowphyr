@@ -15,7 +15,6 @@ import {
   ChevronsUpDown,
   ChevronsDownUp,
   SendHorizontalIcon,
-  Lock,
   Mic,
   MicOff,
 } from "lucide-react";
@@ -55,6 +54,7 @@ import { TokenBar } from "./TokenBar";
 
 import { useVersions } from "@/hooks/useVersions";
 import { useAttachments } from "@/hooks/useAttachments";
+import { useSelectedModelVisionSupport } from "@/hooks/useSelectedModelVisionSupport";
 import { AttachmentsList } from "./AttachmentsList";
 import { DragDropOverlay } from "./DragDropOverlay";
 import { FileAttachmentTypeDialog } from "./FileAttachmentTypeDialog";
@@ -78,6 +78,7 @@ import { SelectedComponentsDisplay } from "./SelectedComponentDisplay";
 import { useCheckProblems } from "@/hooks/useCheckProblems";
 import { LexicalChatInput } from "./LexicalChatInput";
 import { AuxiliaryActionsMenu } from "./AuxiliaryActionsMenu";
+import { CodeIndexButton } from "./CodeIndexButton";
 import { ChatImageGenerationStrip } from "./ChatImageGenerationStrip";
 import {
   chatImageGenerationJobsAtom,
@@ -103,7 +104,6 @@ import { useRouter } from "@tanstack/react-router";
 import { showError as showErrorToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { useVoiceToText } from "@/hooks/useVoiceToText";
-import { isDyadProEnabled } from "@/lib/schemas";
 import { useChatMode } from "@/hooks/useChatMode";
 import { useInitialChatMode } from "@/hooks/useInitialChatMode";
 
@@ -242,6 +242,8 @@ export function ChatInput({ chatId }: { chatId?: number }) {
     cancelPendingFiles,
   } = useAttachments();
 
+  const { modelSupportsVision } = useSelectedModelVisionSupport();
+
   // Use the hook to fetch the proposal
   const {
     proposalResult,
@@ -271,8 +273,6 @@ export function ChatInput({ chatId }: { chatId?: number }) {
       .reverse(); // Most recent first
   }, [chatId, messagesById]);
 
-  const isProEnabled = settings ? isDyadProEnabled(settings) : false;
-
   const handleTranscription = useCallback(
     (text: string) => {
       setInputValue((prev: string) => (prev.trim() ? prev + " " + text : text));
@@ -281,7 +281,7 @@ export function ChatInput({ chatId }: { chatId?: number }) {
   );
 
   const { isRecording, isTranscribing, toggleRecording } = useVoiceToText({
-    enabled: isProEnabled,
+    enabled: true,
     onTranscription: handleTranscription,
     onError: (message) => showErrorToast(message),
   });
@@ -499,6 +499,13 @@ export function ChatInput({ chatId }: { chatId?: number }) {
 
     if (isRecording) {
       await toggleRecording();
+    }
+
+    if (attachments.length > 0 && !modelSupportsVision) {
+      showErrorToast(
+        "The selected model does not support image input. Please remove the attachments or switch to a model with Vision enabled.",
+      );
+      return;
     }
 
     // Build prompt with auto-added image mentions
@@ -743,7 +750,6 @@ export function ChatInput({ chatId }: { chatId?: number }) {
         <ChatErrorBox
           onDismiss={dismissError}
           error={error}
-          isDyadProEnabled={isProEnabled}
           onStartNewChat={handleNewChat}
         />
       )}
@@ -866,54 +872,29 @@ export function ChatInput({ chatId }: { chatId?: number }) {
               />
             )}
 
-          {isProEnabled ? (
-            <VisualEditingChangesDialog
-              iframeRef={
-                previewIframeRef
-                  ? { current: previewIframeRef }
-                  : { current: null }
-              }
-              onReset={() => {
-                // Exit component selection mode and visual editing
-                setSelectedComponents([]);
-                setVisualEditingSelectedComponent(null);
-                setCurrentComponentCoordinates(null);
-                setPendingVisualChanges(new Map());
-                refreshAppIframe();
+          <VisualEditingChangesDialog
+            iframeRef={
+              previewIframeRef
+                ? { current: previewIframeRef }
+                : { current: null }
+            }
+            onReset={() => {
+              // Exit component selection mode and visual editing
+              setSelectedComponents([]);
+              setVisualEditingSelectedComponent(null);
+              setCurrentComponentCoordinates(null);
+              setPendingVisualChanges(new Map());
+              refreshAppIframe();
 
-                // Deactivate component selector in iframe
-                if (previewIframeRef?.contentWindow) {
-                  previewIframeRef.contentWindow.postMessage(
-                    { type: "deactivate-dyad-component-selector" },
-                    "*",
-                  );
-                }
-              }}
-            />
-          ) : (
-            selectedComponents.length > 0 && (
-              <div className="border-b border-border p-3 bg-muted/30">
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <button
-                        onClick={() => {
-                          ipc.system.openExternalUrl("https://dyad.sh/pro");
-                        }}
-                        className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors cursor-pointer"
-                      />
-                    }
-                  >
-                    <Lock size={16} />
-                    <span className="font-medium">{t("visualEditor")}</span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    {t("visualEditorDescription")}
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-            )
-          )}
+              // Deactivate component selector in iframe
+              if (previewIframeRef?.contentWindow) {
+                previewIframeRef.contentWindow.postMessage(
+                  { type: "deactivate-dyad-component-selector" },
+                  "*",
+                );
+              }
+            }}
+          />
 
           <SelectedComponentsDisplay />
 
@@ -922,6 +903,13 @@ export function ChatInput({ chatId }: { chatId?: number }) {
             attachments={attachments}
             onRemove={removeAttachment}
           />
+
+          {/* Vision not supported warning */}
+          {attachments.length > 0 && !modelSupportsVision && (
+            <div className="mx-3 mb-1 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              The selected model does not support image input. Remove the attachments or switch to a model with Vision enabled.
+            </div>
+          )}
 
           {/* Chat image generation strip */}
           <ChatImageGenerationStrip
@@ -951,66 +939,44 @@ export function ChatInput({ chatId }: { chatId?: number }) {
             />
 
             {/* Voice-to-text button */}
-            {isProEnabled ? (
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <button
-                      onClick={toggleRecording}
-                      disabled={isTranscribing}
-                      aria-label={
-                        isRecording
-                          ? t("stopRecording", "Stop recording")
-                          : isTranscribing
-                            ? t("transcribing", "Transcribing...")
-                            : t("voiceToText", "Voice to text")
-                      }
-                      className={cn(
-                        "px-2 py-2 mb-0.5 text-muted-foreground rounded-lg transition-colors duration-150 cursor-pointer disabled:cursor-default disabled:opacity-30",
-                        isRecording &&
-                          "text-red-500 hover:text-red-600 animate-pulse",
-                        !isRecording && !isTranscribing && "hover:text-primary",
-                      )}
-                    />
-                  }
-                >
-                  {isTranscribing ? (
-                    <Loader2 size={20} className="animate-spin" />
-                  ) : isRecording ? (
-                    <MicOff size={20} />
-                  ) : (
-                    <Mic size={20} />
-                  )}
-                </TooltipTrigger>
-                <TooltipContent>
-                  {isRecording
-                    ? t("stopRecording", "Stop recording")
-                    : isTranscribing
-                      ? t("transcribing", "Transcribing...")
-                      : t("voiceToText", "Voice to text")}
-                </TooltipContent>
-              </Tooltip>
-            ) : (
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <button
-                      onClick={() =>
-                        ipc.system.openExternalUrl("https://dyad.sh/pro")
-                      }
-                      aria-label={t("voiceToText", "Voice to text")}
-                      className="px-2 py-2 mb-0.5 text-muted-foreground hover:text-primary rounded-lg transition-colors duration-150 cursor-pointer relative"
-                    />
-                  }
-                >
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <button
+                    onClick={toggleRecording}
+                    disabled={isTranscribing}
+                    aria-label={
+                      isRecording
+                        ? t("stopRecording", "Stop recording")
+                        : isTranscribing
+                          ? t("transcribing", "Transcribing...")
+                          : t("voiceToText", "Voice to text")
+                    }
+                    className={cn(
+                      "px-2 py-2 mb-0.5 text-muted-foreground rounded-lg transition-colors duration-150 cursor-pointer disabled:cursor-default disabled:opacity-30",
+                      isRecording &&
+                        "text-red-500 hover:text-red-600 animate-pulse",
+                      !isRecording && !isTranscribing && "hover:text-primary",
+                    )}
+                  />
+                }
+              >
+                {isTranscribing ? (
+                  <Loader2 size={20} className="animate-spin" />
+                ) : isRecording ? (
+                  <MicOff size={20} />
+                ) : (
                   <Mic size={20} />
-                  <Lock size={10} className="absolute -top-0.5 -right-0.5" />
-                </TooltipTrigger>
-                <TooltipContent>
-                  {t("voiceToText", "Voice to text")}
-                </TooltipContent>
-              </Tooltip>
-            )}
+                )}
+              </TooltipTrigger>
+              <TooltipContent>
+                {isRecording
+                  ? t("stopRecording", "Stop recording")
+                  : isTranscribing
+                    ? t("transcribing", "Transcribing...")
+                    : t("voiceToText", "Voice to text")}
+              </TooltipContent>
+            </Tooltip>
 
             {isStreaming ? (
               <Tooltip>
@@ -1051,8 +1017,9 @@ export function ChatInput({ chatId }: { chatId?: number }) {
             )}
           </div>
           <div className="px-2 flex items-center justify-between pb-0.5 pt-0.5">
-            <div className="flex items-center">
+            <div className="flex items-center gap-2">
               <ChatInputControls showContextFilesPicker={false} />
+              {appId != null && <CodeIndexButton appId={appId} />}
             </div>
 
             <AuxiliaryActionsMenu

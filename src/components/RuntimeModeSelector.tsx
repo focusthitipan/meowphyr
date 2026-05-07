@@ -1,4 +1,4 @@
-import { Label } from "@/components/ui/label";
+﻿import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -7,14 +7,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useSettings } from "@/hooks/useSettings";
-import { useUserBudgetInfo } from "@/hooks/useUserBudgetInfo";
 import { showError } from "@/lib/toast";
 import { ipc } from "@/ipc/types";
 import { useAtomValue } from "jotai";
 import { appUrlAtom } from "@/atoms/appAtoms";
 import { useTranslation } from "react-i18next";
 import type { RuntimeMode2 } from "@/lib/schemas";
-import { isDyadProEnabled } from "@/lib/schemas";
 import { useState } from "react";
 import {
   AlertDialog,
@@ -34,14 +32,13 @@ export function shouldShowCloudSandboxOption({
   runtimeMode: RuntimeMode2;
   cloudSandboxExperimentEnabled: boolean;
 }) {
-  // Cloud Sandbox requires Dyad server — always hidden
+  // Cloud Sandbox requires Meowphyr server — always hidden
   return false;
 }
 
 export function RuntimeModeSelector() {
   const { settings, updateSettings } = useSettings();
   const { t } = useTranslation(["settings", "common"]);
-  const { userBudget } = useUserBudgetInfo();
   const currentAppUrl = useAtomValue(appUrlAtom);
   const [pendingRuntimeMode, setPendingRuntimeMode] =
     useState<RuntimeMode2 | null>(null);
@@ -51,10 +48,9 @@ export function RuntimeModeSelector() {
     return null;
   }
 
-  const isProEnabled = isDyadProEnabled(settings);
   const isDockerMode = settings?.runtimeMode2 === "docker";
   const isCloudMode = settings?.runtimeMode2 === "cloud";
-  const hasCloudSandboxAccess = isProEnabled || Boolean(userBudget);
+  const hasCloudSandboxAccess = false;
   const showCloudSandboxOption = shouldShowCloudSandboxOption({
     runtimeMode: settings.runtimeMode2 ?? "host",
     cloudSandboxExperimentEnabled: !!settings.experiments?.enableCloudSandbox,
@@ -116,7 +112,7 @@ export function RuntimeModeSelector() {
       </div>
       {showCloudSandboxOption && !hasCloudSandboxAccess && (
         <div className="text-sm text-muted-foreground bg-muted/40 p-2 rounded">
-          Cloud sandboxes are a Dyad Pro feature.{" "}
+          Cloud sandboxes are a Meowphyr Pro feature.{" "}
           <button
             type="button"
             className="underline font-medium cursor-pointer text-primary"

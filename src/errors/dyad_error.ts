@@ -44,7 +44,7 @@ export class DyadError extends Error {
 
   constructor(message: string, kind: DyadErrorKind) {
     super(message);
-    this.name = "DyadError";
+    this.name = "AppError";
     this.kind = kind;
   }
 }

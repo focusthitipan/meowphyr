@@ -111,6 +111,7 @@ export function registerLanguageModelHandlers() {
         description,
         maxOutputTokens,
         contextWindow,
+        supportsVision,
       } = params;
 
       // Validation
@@ -152,6 +153,7 @@ export function registerLanguageModelHandlers() {
         description: description || null,
         max_output_tokens: maxOutputTokens || null,
         context_window: contextWindow || null,
+        supports_vision: supportsVision ?? false,
       });
     },
   );

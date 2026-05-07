@@ -73,17 +73,6 @@ export const DoesReleaseNoteExistResultSchema = z.object({
   url: z.string().optional(),
 });
 
-export const UserBudgetInfoSchema = z
-  .object({
-    usedCredits: z.number(),
-    totalCredits: z.number(),
-    budgetResetDate: z.date(),
-    redactedUserId: z.string(),
-    isTrial: z.boolean(),
-  })
-  .nullable();
-
-export type UserBudgetInfo = z.infer<typeof UserBudgetInfoSchema>;
 
 export const TelemetryEventPayloadSchema = z.object({
   eventName: z.string(),
@@ -236,13 +225,6 @@ export const systemContracts = {
     channel: "does-release-note-exist",
     input: DoesReleaseNoteExistParamsSchema,
     output: DoesReleaseNoteExistResultSchema,
-  }),
-
-  // Budget
-  getUserBudget: defineContract({
-    channel: "get-user-budget",
-    input: z.void(),
-    output: UserBudgetInfoSchema,
   }),
 
   // Upload

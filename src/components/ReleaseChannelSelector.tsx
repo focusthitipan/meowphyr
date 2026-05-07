@@ -1,4 +1,4 @@
-import { useSettings } from "@/hooks/useSettings";
+﻿import { useSettings } from "@/hooks/useSettings";
 
 import {
   Select,
@@ -36,9 +36,9 @@ export function ReleaseChannelSelector() {
     } else {
       toast("Using Beta release channel", {
         description:
-          "You will need to restart Dyad for your settings to take effect.",
+          "You will need to restart Meowphyr for your settings to take effect.",
         action: {
-          label: "Restart Dyad",
+          label: "Restart Meowphyr",
           onClick: () => {
             ipc.system.restartDyad();
           },

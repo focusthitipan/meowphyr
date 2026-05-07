@@ -1,4 +1,4 @@
-import {
+﻿import {
   app,
   autoUpdater,
   BrowserWindow,
@@ -188,7 +188,7 @@ export async function onReady() {
   // See: https://git-scm.com/docs/git-config#Documentation/git-config.txt-safedirectory
   if (settings.enableNativeGit) {
     // Don't need to await because this only needs to run before
-    // the user starts interacting with Dyad app and uses a git-related feature.
+    // the user starts interacting with Meowphyr app and uses a git-related feature.
     gitAddSafeDirectory(`${getDyadAppsBaseDirectory()}/*`);
   }
 
@@ -392,6 +392,19 @@ const createWindow = () => {
     mainWindow.loadFile(
       path.join(__dirname, "../renderer/main_window/index.html"),
     );
+  }
+
+  // Retry loading if Vite dev server isn't ready yet (ERR_ABORTED = -3)
+  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+    mainWindow.webContents.on("did-fail-load", (_event, errorCode) => {
+      if (errorCode === -3 || errorCode === -102) {
+        setTimeout(() => {
+          if (!mainWindow?.isDestroyed()) {
+            mainWindow?.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
+          }
+        }, 500);
+      }
+    });
   }
 
   // Handle force-close message and development reload coordination

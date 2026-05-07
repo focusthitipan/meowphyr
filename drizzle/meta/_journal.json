@@ -204,6 +204,13 @@
       "when": 1776728360068,
       "tag": "0028_icy_veda",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "6",
+      "when": 1778145045517,
+      "tag": "0029_foamy_mandroid",
+      "breakpoints": true
     }
   ]
 }

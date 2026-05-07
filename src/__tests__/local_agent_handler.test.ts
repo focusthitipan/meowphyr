@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+﻿import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { IpcMainInvokeEvent, WebContents } from "electron";
 import { streamText } from "ai";
 
@@ -327,61 +327,6 @@ describe("handleLocalAgentStream", () => {
     mockPerformCompaction.mockResolvedValue({ success: true });
     mockCheckAndMarkForCompaction.mockResolvedValue(false);
     vi.mocked(streamText).mockClear();
-  });
-
-  describe("Pro status validation", () => {
-    it("should send error when Dyad Pro is not enabled", async () => {
-      // Arrange
-      const { event, getMessagesByChannel } = createFakeEvent();
-      mockSettings = buildTestSettings({ enableDyadPro: false });
-      mockChatData = buildTestChat();
-
-      // Act
-      await handleLocalAgentStream(
-        event,
-        { chatId: 1, prompt: "test" },
-        new AbortController(),
-        {
-          placeholderMessageId: 10,
-          systemPrompt: "You are helpful",
-          dyadRequestId,
-        },
-      );
-
-      // Assert
-      const errorMessages = getMessagesByChannel("chat:response:error");
-      expect(errorMessages).toHaveLength(1);
-      expect(errorMessages[0].args[0]).toMatchObject({
-        chatId: 1,
-        error: expect.stringContaining("Agent v2 requires Dyad Pro"),
-      });
-    });
-
-    it("should send error when API key is missing even if Pro is enabled", async () => {
-      // Arrange
-      const { event, getMessagesByChannel } = createFakeEvent();
-      mockSettings = buildTestSettings({
-        enableDyadPro: true,
-        hasApiKey: false,
-      });
-      mockChatData = buildTestChat();
-
-      // Act
-      await handleLocalAgentStream(
-        event,
-        { chatId: 1, prompt: "test" },
-        new AbortController(),
-        {
-          placeholderMessageId: 10,
-          systemPrompt: "You are helpful",
-          dyadRequestId,
-        },
-      );
-
-      // Assert
-      const errorMessages = getMessagesByChannel("chat:response:error");
-      expect(errorMessages).toHaveLength(1);
-    });
   });
 
   describe("Chat lookup", () => {
@@ -724,7 +669,7 @@ describe("handleLocalAgentStream", () => {
         return {
           success: true,
           summary: "mid-turn summary",
-          backupPath: ".dyad/chats/1/compaction-test.md",
+          backupPath: ".meowphyr/chats/1/compaction-test.md",
         };
       });
 
@@ -825,7 +770,7 @@ describe("handleLocalAgentStream", () => {
       const compactionIndex = finalContent.indexOf("Conversation compacted");
       const doneIndex = finalContent.indexOf("done");
       const backupPathIndex = finalContent.indexOf(
-        ".dyad/chats/1/compaction-test.md",
+        ".meowphyr/chats/1/compaction-test.md",
       );
 
       expect(beforeCompactionIndex).toBeGreaterThanOrEqual(0);
@@ -889,7 +834,7 @@ describe("handleLocalAgentStream", () => {
         return {
           success: true,
           summary: "mid-turn summary",
-          backupPath: ".dyad/chats/1/compaction-test.md",
+          backupPath: ".meowphyr/chats/1/compaction-test.md",
         };
       });
 

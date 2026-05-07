@@ -1,4 +1,4 @@
-import { ipcMain, app, dialog } from "electron";
+﻿import { ipcMain, app, dialog } from "electron";
 import { db, getDatabasePath } from "../../db";
 import { apps, chats, messages } from "../../db/schema";
 import { desc, eq, inArray, like } from "drizzle-orm";
@@ -88,7 +88,6 @@ import {
   destroyCloudSandbox,
   getCloudSandboxStatus,
   queueCloudSandboxSnapshotSync,
-  reconcileCloudSandboxes,
   registerRunningCloudSandbox,
   restartCloudSandbox,
   setCloudSandboxSyncUpdateListener,
@@ -137,11 +136,11 @@ function formatCloudSandboxError(error: unknown) {
 
   switch (error.code) {
     case "sandbox_pro_required":
-      return "Dyad Pro is required to use cloud sandboxes.";
+      return "Meowphyr Pro is required to use cloud sandboxes.";
     case "sandbox_insufficient_credits":
       return "You need at least 1 credit available to start a cloud sandbox.";
     case "sandbox_billing_unavailable":
-      return "Dyad couldn’t verify sandbox billing right now. Please try again.";
+      return "Meowphyr couldn’t verify sandbox billing right now. Please try again.";
     case "sandbox_credits_exhausted":
       return "This cloud sandbox stopped because your credits ran out.";
     default:
@@ -149,13 +148,13 @@ function formatCloudSandboxError(error: unknown) {
         return "This cloud sandbox is no longer available.";
       }
       if (error.status === 401 || error.status === 403) {
-        return "Dyad couldn’t authorize the cloud sandbox request. Please try again.";
+        return "Meowphyr couldn’t authorize the cloud sandbox request. Please try again.";
       }
       if (error.status === 429) {
-        return "Dyad is rate limiting cloud sandbox requests right now. Please try again.";
+        return "Meowphyr is rate limiting cloud sandbox requests right now. Please try again.";
       }
       if (typeof error.status === "number" && error.status >= 500) {
-        return "Dyad’s cloud sandbox service is temporarily unavailable. Please try again.";
+        return "Meowphyr’s cloud sandbox service is temporarily unavailable. Please try again.";
       }
       return error.message;
   }
@@ -605,7 +604,7 @@ function listenToProcess({
     // This is a hacky heuristic to pick up when drizzle is asking for user
     // to select from one of a few choices. We automatically pick the first
     // option because it's usually a good default choice. We guard this with
-    // isNeon because: 1) only Neon apps (for the official Dyad templates) should
+    // isNeon because: 1) only Neon apps (for the official Meowphyr templates) should
     // get this template and 2) it's safer to do this with Neon apps because
     // their databases have point in time restore built-in.
     if (isNeon && message.includes("created or renamed from another")) {
@@ -1266,7 +1265,7 @@ export function registerAppHandlers() {
     // Create initial commit
     const commitHash = await gitCommit({
       path: fullAppPath,
-      message: "Init Dyad app",
+      message: "Init Meowphyr app",
     });
 
     // Update chat with initial commit hash
@@ -1347,7 +1346,7 @@ export function registerAppHandlers() {
       // Create initial commit
       await gitCommit({
         path: newAppPath,
-        message: "Init Dyad app",
+        message: "Init Meowphyr app",
       });
     }
 
@@ -1964,6 +1963,16 @@ export function registerAppHandlers() {
         throw new Error(
           `App deleted from database, but failed to delete app files. Please delete app files from ${appPath} manually.\n\nError: ${error.message}`,
         );
+      }
+
+      // Delete code index (embedding DB) for this app
+      try {
+        const { clearIndex } = await import(
+          "../../pro/main/ipc/handlers/local_agent/indexing/vector_store"
+        );
+        clearIndex(appId);
+      } catch (error: any) {
+        logger.warn(`Failed to delete code index for app ${appId}:`, error);
       }
     });
   });
@@ -2848,10 +2857,6 @@ export function registerAppHandlers() {
     );
 
     return { thumbnails };
-  });
-
-  void reconcileCloudSandboxes().catch((error) => {
-    logger.warn("Failed to reconcile cloud sandboxes on startup:", error);
   });
 
   // Start the garbage collection for idle apps

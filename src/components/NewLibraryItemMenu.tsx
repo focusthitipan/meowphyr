@@ -1,4 +1,4 @@
-import { Palette, FileText, Plus, ChevronDown } from "lucide-react";
+import { Palette, FileText, Plus, ChevronDown, Zap } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,9 +9,11 @@ import {
 export function NewLibraryItemMenu({
   onNewPrompt,
   onNewTheme,
+  onNewSkill,
 }: {
   onNewPrompt: () => void;
   onNewTheme: () => void;
+  onNewSkill: () => void;
 }) {
   return (
     <DropdownMenu>
@@ -29,7 +31,10 @@ export function NewLibraryItemMenu({
           <Palette className="mr-2 h-4 w-4" />
           New Theme
         </DropdownMenuItem>
-
+        <DropdownMenuItem onClick={onNewSkill}>
+          <Zap className="mr-2 h-4 w-4" />
+          New Skill
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

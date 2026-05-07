@@ -1,4 +1,4 @@
-import { ipc } from "@/ipc/types";
+﻿import { ipc } from "@/ipc/types";
 import { useFreeAgentQuota } from "@/hooks/useFreeAgentQuota";
 import { AI_STREAMING_ERROR_MESSAGE_PREFIX } from "@/shared/texts";
 import {
@@ -18,12 +18,10 @@ import {
 export function ChatErrorBox({
   onDismiss,
   error,
-  isDyadProEnabled,
   onStartNewChat,
 }: {
   onDismiss: () => void;
   error: string;
-  isDyadProEnabled: boolean;
   onStartNewChat?: () => void;
 }) {
   const { messagesLimit } = useFreeAgentQuota();
@@ -37,7 +35,7 @@ export function ChatErrorBox({
             href="https://dyad.sh/pro?utm_source=dyad-app&utm_medium=app&utm_campaign=free-quota-error"
             variant="primary"
           >
-            Access with Dyad Pro
+            Access with Meowphyr Pro
           </ExternalLink>
         </span>{" "}
         or switch to another model.
@@ -48,55 +46,30 @@ export function ChatErrorBox({
   // Important, this needs to come after the "free quota tier" check
   // because it also includes this URL in the error message
   //
-  // Sometimes Dyad Pro can return rate limit errors and we do not want to
-  // show the upgrade to Dyad Pro link in that case because they are
-  // already on the Dyad Pro plan.
-  if (
-    !isDyadProEnabled &&
-    (error.includes("Resource has been exhausted") ||
-      error.includes("https://ai.google.dev/gemini-api/docs/rate-limits") ||
-      error.includes("Provider returned error"))
-  ) {
-    return (
-      <ChatErrorContainer onDismiss={onDismiss}>
-        {error}
-        <div className="mt-2 space-y-2 space-x-2">
-          <ExternalLink
-            href="https://dyad.sh/pro?utm_source=dyad-app&utm_medium=app&utm_campaign=rate-limit-error"
-            variant="primary"
-          >
-            Upgrade to Dyad Pro
-          </ExternalLink>
-
-          <ExternalLink href="https://dyad.sh/docs/help/ai-rate-limit">
-            Troubleshooting guide
-          </ExternalLink>
-        </div>
-      </ChatErrorContainer>
-    );
-  }
-
+  // Sometimes Meowphyr Pro can return rate limit errors and we do not want to
+  // show the upgrade to Meowphyr Pro link in that case because they are
+  // already on the Meowphyr Pro plan.
   if (error.includes("LiteLLM Virtual Key expected")) {
     return (
       <ChatInfoContainer onDismiss={onDismiss}>
         <span>
-          Looks like you don't have a valid Dyad Pro key.{" "}
+          Looks like you don't have a valid Meowphyr Pro key.{" "}
           <ExternalLink
             href="https://dyad.sh/pro?utm_source=dyad-app&utm_medium=app&utm_campaign=invalid-pro-key-error"
             variant="primary"
           >
-            Upgrade to Dyad Pro
+            Upgrade to Meowphyr Pro
           </ExternalLink>{" "}
           today.
         </span>
       </ChatInfoContainer>
     );
   }
-  if (isDyadProEnabled && error.includes("ExceededBudget:")) {
+  if (error.includes("ExceededBudget:")) {
     return (
       <ChatInfoContainer onDismiss={onDismiss}>
         <span>
-          You have used all of your Dyad AI credits this month.{" "}
+          You have used all of your Meowphyr AI credits this month.{" "}
           <ExternalLink
             href="https://academy.dyad.sh/subscription?utm_source=dyad-app&utm_medium=app&utm_campaign=exceeded-budget-error"
             variant="primary"
@@ -122,13 +95,13 @@ export function ChatErrorBox({
     return (
       <ChatErrorContainer onDismiss={onDismiss}>
         You have used all {messagesLimit} free Agent messages for today. Please
-        upgrade to Dyad Pro for unlimited access or switch to Build mode.
+        upgrade to Meowphyr Pro for unlimited access or switch to Build mode.
         <div className="mt-2 space-y-2 space-x-2">
           <ExternalLink
             href="https://dyad.sh/pro?utm_source=dyad-app&utm_medium=app&utm_campaign=free-agent-quota-exceeded"
             variant="primary"
           >
-            Upgrade to Dyad Pro
+            Upgrade to Meowphyr Pro
           </ExternalLink>
         </div>
       </ChatErrorContainer>
@@ -139,17 +112,7 @@ export function ChatErrorBox({
     <ChatErrorContainer onDismiss={onDismiss}>
       {error}
       <div className="mt-2 space-y-2 space-x-2">
-        {!isDyadProEnabled &&
-          error.includes(AI_STREAMING_ERROR_MESSAGE_PREFIX) &&
-          !error.includes("TypeError: terminated") && (
-            <ExternalLink
-              href="https://dyad.sh/pro?utm_source=dyad-app&utm_medium=app&utm_campaign=general-error"
-              variant="primary"
-            >
-              Upgrade to Dyad Pro
-            </ExternalLink>
-          )}
-        {isDyadProEnabled && onStartNewChat && (
+        {onStartNewChat && (
           <Tooltip>
             <TooltipTrigger
               onClick={onStartNewChat}

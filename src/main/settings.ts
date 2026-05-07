@@ -1,4 +1,4 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
 import { getUserDataPath } from "../paths/paths";
 import {
@@ -47,6 +47,12 @@ const DEFAULT_SETTINGS: UserSettings = {
   releaseChannel: "stable",
   imageGenerationBaseUrl: "https://api.openai.com/v1",
   imageGenerationModel: "gpt-image-1",
+  embeddingBaseUrl: "https://api.mistral.ai/v1",
+  embeddingModel: "codestral-embed-2505",
+  embeddingSearchMinScore: 0.4,
+  embeddingSearchMaxResults: 50,
+  embeddingBatchSize: 60,
+  embeddingScannerMaxRetries: 3,
   selectedTemplateId: DEFAULT_TEMPLATE_ID,
   selectedThemeId: DEFAULT_THEME_ID,
   isRunning: false,
@@ -327,7 +333,7 @@ function readSettingsForWrite(filePath: string): {
     logger.error("Existing settings file is unreadable:", error);
     notifyRendererError({
       message:
-        "Dyad could not read your existing settings file, so it fell back to default settings.",
+        "Meowphyr could not read your existing settings file, so it fell back to default settings.",
       action: {
         label: "Read restore docs",
         url: RESTORE_SETTINGS_DOCS_URL,

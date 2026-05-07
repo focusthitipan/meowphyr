@@ -1,6 +1,7 @@
 import path from "node:path";
 import { DyadError, DyadErrorKind } from "@/errors/dyad_error";
 import type { AgentContext } from "./types";
+import { DYAD_INTERNAL_DIR_NAME } from "@/ipc/utils/media_path_utils";
 
 /**
  * Resolve the app path a read-only tool should target.
@@ -40,13 +41,13 @@ export function resolveTargetAppPath(
  * not part of the `@app:Name` reference contract and must not be exposed to
  * read-only tools when targeting another app.
  */
-export const DYAD_INTERNAL_GLOB = "**/.dyad/**";
+export const DYAD_INTERNAL_GLOB = `**/${DYAD_INTERNAL_DIR_NAME}/**`;
 
 /**
- * Negated glob for ripgrep's `--glob` flag, excluding `.dyad/` at the app root
+ * Negated glob for ripgrep's `--glob` flag, excluding the internal dir at the app root
  * (ripgrep globs are relative to cwd, which is the target app path).
  */
-export const DYAD_INTERNAL_RIPGREP_EXCLUDE = "!.dyad/**";
+export const DYAD_INTERNAL_RIPGREP_EXCLUDE = `!${DYAD_INTERNAL_DIR_NAME}/**`;
 
 /**
  * Is `relativePath` inside a `.dyad/` folder at the app root?
@@ -57,7 +58,7 @@ export const DYAD_INTERNAL_RIPGREP_EXCLUDE = "!.dyad/**";
  */
 export function isDyadInternalPath(relativePath: string): boolean {
   const normalized = relativePath.replace(/\\/g, "/").replace(/^\.\//, "");
-  return normalized.split("/")[0] === ".dyad";
+  return normalized.split("/")[0] === DYAD_INTERNAL_DIR_NAME;
 }
 
 /**
@@ -96,7 +97,7 @@ export function assertDyadInternalAccessAllowed({
   const relativeFromApp = path.relative(targetAppPath, fullFilePath);
   if (isDyadInternalPath(relativeFromApp)) {
     throw new DyadError(
-      `Cannot read .dyad/ paths from referenced apps — these files are not part of the @app reference contract.`,
+      `Cannot read ${DYAD_INTERNAL_DIR_NAME}/ paths from referenced apps — these files are not part of the @app reference contract.`,
       DyadErrorKind.Validation,
     );
   }

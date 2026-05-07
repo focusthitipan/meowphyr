@@ -5,25 +5,16 @@ import {
 } from "@/db/schema";
 import type { LanguageModelProvider, LanguageModel } from "@/ipc/types";
 import { eq } from "drizzle-orm";
-import log from "electron-log";
 import {
   CLOUD_PROVIDERS,
   LOCAL_PROVIDERS,
   MODEL_OPTIONS,
   PROVIDER_TO_ENV_VAR,
 } from "./language_model_constants";
-import { getBuiltinLanguageModelCatalog } from "./remote_language_model_catalog";
 
-const logger = log.scope("language_model_helpers");
-/**
- * Fetches language model providers from both the database (custom) and hardcoded constants (cloud),
- * merging them with custom providers taking precedence.
- * @returns A promise that resolves to an array of LanguageModelProvider objects.
- */
 export async function getLanguageModelProviders(): Promise<
   LanguageModelProvider[]
 > {
-  // Fetch custom providers from the database
   const customProvidersDb = await db
     .select()
     .from(languageModelProvidersSchema);
@@ -36,40 +27,23 @@ export async function getLanguageModelProviders(): Promise<
       apiBaseUrl: cp.api_base_url,
       envVarName: cp.env_var_name ?? undefined,
       type: "custom",
-      // hasFreeTier, websiteUrl, gatewayPrefix are not in the custom DB schema
-      // They will be undefined unless overridden by hardcoded values if IDs match
     });
   }
 
-  const builtinCatalog = await getBuiltinLanguageModelCatalog();
-  logger.info("Loaded builtin catalog for provider list", {
-    source: builtinCatalog.source,
-    version: builtinCatalog.version,
-    providerCount: builtinCatalog.providers.length,
-  });
-
-  const hardcodedProviders: LanguageModelProvider[] = [
-    ...builtinCatalog.providers,
-  ];
-
-  // Merge in any CLOUD_PROVIDERS not present in the remote catalog
-  // (e.g. auto, azure, bedrock which are not in the remote API).
-  for (const [providerId, providerDetails] of Object.entries(CLOUD_PROVIDERS)) {
-    if (!hardcodedProviders.some((p) => p.id === providerId)) {
-      hardcodedProviders.push({
-        id: providerId,
-        name: providerDetails.displayName,
-        hasFreeTier: providerDetails.hasFreeTier,
-        websiteUrl: providerDetails.websiteUrl,
-        gatewayPrefix: providerDetails.gatewayPrefix,
-        secondary: providerDetails.secondary,
-        envVarName:
-          PROVIDER_TO_ENV_VAR[providerId as keyof typeof PROVIDER_TO_ENV_VAR] ??
-          undefined,
-        type: "cloud",
-      });
-    }
-  }
+  const hardcodedProviders: LanguageModelProvider[] = Object.entries(
+    CLOUD_PROVIDERS,
+  ).map(([providerId, providerDetails]) => ({
+    id: providerId,
+    name: providerDetails.displayName,
+    hasFreeTier: providerDetails.hasFreeTier,
+    websiteUrl: providerDetails.websiteUrl,
+    gatewayPrefix: providerDetails.gatewayPrefix,
+    secondary: providerDetails.secondary,
+    envVarName:
+      PROVIDER_TO_ENV_VAR[providerId as keyof typeof PROVIDER_TO_ENV_VAR] ??
+      undefined,
+    type: "cloud" as const,
+  }));
 
   for (const providerKey in LOCAL_PROVIDERS) {
     if (Object.prototype.hasOwnProperty.call(LOCAL_PROVIDERS, providerKey)) {
@@ -117,6 +91,7 @@ export async function getLanguageModels({
         description: languageModelsSchema.description,
         maxOutputTokens: languageModelsSchema.max_output_tokens,
         contextWindow: languageModelsSchema.context_window,
+        supportsVision: languageModelsSchema.supports_vision,
       })
       .from(languageModelsSchema)
       .where(
@@ -131,6 +106,7 @@ export async function getLanguageModels({
       tag: undefined,
       maxOutputTokens: model.maxOutputTokens ?? undefined,
       contextWindow: model.contextWindow ?? undefined,
+      supportsVision: model.supportsVision ?? false,
       type: "custom",
     }));
   } catch (error) {
@@ -144,18 +120,7 @@ export async function getLanguageModels({
   // If it's a cloud provider, also get the hardcoded models
   let hardcodedModels: LanguageModel[] = [];
   if (provider.type === "cloud") {
-    const builtinCatalog = await getBuiltinLanguageModelCatalog();
-    logger.info("Loading cloud models from builtin catalog", {
-      providerId,
-      source: builtinCatalog.source,
-      version: builtinCatalog.version,
-      hasProviderModels: providerId in builtinCatalog.modelsByProvider,
-    });
-    if (providerId in builtinCatalog.modelsByProvider) {
-      hardcodedModels = builtinCatalog.modelsByProvider[providerId] || [];
-    } else if (providerId in MODEL_OPTIONS) {
-      // Fall back to hardcoded MODEL_OPTIONS for providers not in the remote
-      // catalog (e.g. auto, azure, bedrock).
+    if (providerId in MODEL_OPTIONS) {
       hardcodedModels = MODEL_OPTIONS[providerId].map((model) => ({
         apiName: model.name,
         displayName: model.displayName,
@@ -168,10 +133,6 @@ export async function getLanguageModels({
         dollarSigns: model.dollarSigns,
         type: "cloud" as const,
       }));
-    } else {
-      console.warn(
-        `Provider "${providerId}" is cloud type but not found in builtin catalog or MODEL_OPTIONS.`,
-      );
     }
   }
 

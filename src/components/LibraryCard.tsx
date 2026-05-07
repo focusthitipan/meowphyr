@@ -3,10 +3,12 @@ import {
   useDeleteCustomTheme,
 } from "@/hooks/useCustomThemes";
 import type { PromptItem } from "@/hooks/usePrompts";
+import type { SkillDto } from "@/ipc/types/skills";
 import { Badge } from "@/components/ui/badge";
-import { Palette, FileText } from "lucide-react";
+import { Palette, FileText, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CreateOrEditPromptDialog } from "@/components/CreatePromptDialog";
+import { CreateOrEditSkillDialog } from "@/components/CreateOrEditSkillDialog";
 import { DeleteConfirmationDialog } from "@/components/DeleteConfirmationDialog";
 import { EditThemeDialog } from "@/components/EditThemeDialog";
 import { showError } from "@/lib/toast";
@@ -14,7 +16,8 @@ import type { CustomTheme } from "@/ipc/types";
 
 export type LibraryItem =
   | { type: "theme"; data: CustomTheme }
-  | { type: "prompt"; data: PromptItem };
+  | { type: "prompt"; data: PromptItem }
+  | { type: "skill"; data: SkillDto };
 
 const CARD_TYPE_CONFIG = {
   theme: {
@@ -29,12 +32,20 @@ const CARD_TYPE_CONFIG = {
     badgeClass:
       "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800",
   },
+  skill: {
+    icon: Zap,
+    label: "Skill",
+    badgeClass:
+      "bg-green-100 text-green-700 border-green-200 dark:bg-green-900/40 dark:text-green-300 dark:border-green-800",
+  },
 } as const;
 
 export function LibraryCard({
   item,
   onUpdatePrompt,
   onDeletePrompt,
+  onUpdateSkill,
+  onDeleteSkill,
 }: {
   item: LibraryItem;
   onUpdatePrompt?: (p: {
@@ -44,14 +55,37 @@ export function LibraryCard({
     content: string;
   }) => Promise<void>;
   onDeletePrompt?: (id: number) => Promise<void>;
+  onUpdateSkill?: (p: {
+    oldSlug: string;
+    slug: string;
+    name: string;
+    description?: string;
+    argumentHint?: string;
+    disableModelInvocation?: boolean;
+    userInvocable?: boolean;
+    content: string;
+  }) => Promise<unknown>;
+  onDeleteSkill?: (slug: string) => Promise<unknown>;
 }) {
   const config = CARD_TYPE_CONFIG[item.type];
   const Icon = config.icon;
 
-  const title = item.type === "theme" ? item.data.name : item.data.title;
+  const title =
+    item.type === "theme"
+      ? item.data.name
+      : item.type === "skill"
+        ? item.data.title
+        : item.data.title;
   const description = item.data.description;
   const content = item.type === "theme" ? item.data.prompt : item.data.content;
-  const slug = item.type === "prompt" ? item.data.slug : null;
+  const slug =
+    item.type === "prompt"
+      ? item.data.slug
+      : item.type === "skill"
+        ? item.data.slug
+        : null;
+  const argumentHint =
+    item.type === "skill" ? item.data.argumentHint : null;
 
   return (
     <div
@@ -80,6 +114,14 @@ export function LibraryCard({
             {slug && (
               <p className="text-xs text-muted-foreground mt-1">
                 Use <code className="font-mono">/{slug}</code> in chat
+                {argumentHint && (
+                  <span className="ml-1 italic">{argumentHint}</span>
+                )}
+              </p>
+            )}
+            {item.type === "skill" && (
+              <p className="text-xs text-muted-foreground mt-0.5 italic">
+                Loaded from skills folder
               </p>
             )}
           </div>
@@ -90,7 +132,7 @@ export function LibraryCard({
         <div className="flex gap-1 justify-end">
           {item.type === "theme" ? (
             <ThemeActions theme={item.data} />
-          ) : (
+          ) : item.type === "prompt" ? (
             onUpdatePrompt &&
             onDeletePrompt && (
               <PromptActions
@@ -99,7 +141,13 @@ export function LibraryCard({
                 onDelete={onDeletePrompt}
               />
             )
-          )}
+          ) : item.type === "skill" && onUpdateSkill && onDeleteSkill ? (
+            <SkillActions
+              skill={item.data}
+              onUpdate={onUpdateSkill}
+              onDelete={onDeleteSkill}
+            />
+          ) : null}
         </div>
       </div>
     </div>
@@ -168,6 +216,36 @@ function PromptActions({
         itemName={prompt.title}
         itemType="Prompt"
         onDelete={() => onDelete(prompt.id)}
+      />
+    </>
+  );
+}
+
+function SkillActions({
+  skill,
+  onUpdate,
+  onDelete,
+}: {
+  skill: SkillDto;
+  onUpdate: (p: {
+    oldSlug: string;
+    slug: string;
+    name: string;
+    description?: string;
+    argumentHint?: string;
+    disableModelInvocation?: boolean;
+    userInvocable?: boolean;
+    content: string;
+  }) => Promise<unknown>;
+  onDelete: (slug: string) => Promise<unknown>;
+}) {
+  return (
+    <>
+      <CreateOrEditSkillDialog mode="edit" skill={skill} onUpdateSkill={onUpdate} />
+      <DeleteConfirmationDialog
+        itemName={skill.title}
+        itemType="Skill"
+        onDelete={async () => { await onDelete(skill.slug); }}
       />
     </>
   );

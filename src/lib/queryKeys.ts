@@ -207,6 +207,13 @@ export const queryKeys = {
   },
 
   // ─────────────────────────────────────────────────────────────────────────────
+  // Skills (unified: DB prompts-with-slug + global file skills)
+  // ─────────────────────────────────────────────────────────────────────────────
+  skills: {
+    all: ["skills"] as const,
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────────
   // Agent Tools
   // ─────────────────────────────────────────────────────────────────────────────
   agentTools: {
@@ -221,13 +228,6 @@ export const queryKeys = {
     byProviders: ["language-models-by-providers"] as const,
     forProvider: ({ providerId }: { providerId: string }) =>
       ["language-models", providerId] as const,
-  },
-
-  // ─────────────────────────────────────────────────────────────────────────────
-  // User Budget
-  // ─────────────────────────────────────────────────────────────────────────────
-  userBudget: {
-    info: ["userBudgetInfo"] as const,
   },
 
   cloudSandboxes: {
@@ -392,11 +392,11 @@ export type AppQueryKey =
     >
   | QueryKeyOf<(typeof queryKeys.templates)[keyof typeof queryKeys.templates]>
   | QueryKeyOf<(typeof queryKeys.prompts)[keyof typeof queryKeys.prompts]>
+  | QueryKeyOf<(typeof queryKeys.skills)[keyof typeof queryKeys.skills]>
   | QueryKeyOf<(typeof queryKeys.agentTools)[keyof typeof queryKeys.agentTools]>
   | QueryKeyOf<
       (typeof queryKeys.languageModels)[keyof typeof queryKeys.languageModels]
     >
-  | QueryKeyOf<(typeof queryKeys.userBudget)[keyof typeof queryKeys.userBudget]>
   | QueryKeyOf<
       (typeof queryKeys.cloudSandboxes)[keyof typeof queryKeys.cloudSandboxes]
     >

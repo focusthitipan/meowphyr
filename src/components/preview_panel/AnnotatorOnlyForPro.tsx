@@ -1,4 +1,4 @@
-import { Lock, ArrowLeft } from "lucide-react";
+﻿import { Lock, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ipc } from "@/ipc/types";
 
@@ -36,7 +36,7 @@ export const AnnotatorOnlyForPro = ({ onGoBack }: AnnotatorOnlyForProProps) => {
         </h2>
         <p className="text-muted-foreground mb-10 text-center max-w-md text-base leading-relaxed">
           Unlock the ability to annotate screenshots and enhance your workflow
-          with Dyad Pro.
+          with Meowphyr Pro.
         </p>
 
         {/* Get Pro Button */}
@@ -45,7 +45,7 @@ export const AnnotatorOnlyForPro = ({ onGoBack }: AnnotatorOnlyForProProps) => {
           size="lg"
           className="px-8 shadow-md hover:shadow-lg transition-all"
         >
-          Get Dyad Pro
+          Get Meowphyr Pro
         </Button>
       </div>
     </div>

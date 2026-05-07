@@ -1,4 +1,4 @@
-import { dialog } from "electron";
+﻿import { dialog } from "electron";
 import { mkdir } from "fs/promises";
 import log from "electron-log";
 import { join, isAbsolute, normalize } from "path";
@@ -35,7 +35,7 @@ export function registerCustomAppsFolderHandlers() {
     const { filePaths, canceled } = await dialog.showOpenDialog({
       title: "Select Custom Apps Folder",
       properties: ["openDirectory"],
-      message: "Select the folder where Dyad apps should be stored",
+      message: "Select the folder where Meowphyr apps should be stored",
     });
 
     if (canceled) {

@@ -1,4 +1,4 @@
-import {
+﻿import {
   SendHorizontalIcon,
   StopCircleIcon,
   FolderOpenIcon,
@@ -6,7 +6,6 @@ import {
   Mic,
   MicOff,
   Loader2,
-  Lock,
 } from "lucide-react";
 import {
   Tooltip,
@@ -34,10 +33,9 @@ import { cn } from "@/lib/utils";
 import { useLoadApps } from "@/hooks/useLoadApps";
 import { AppSearchDialog } from "../AppSearchDialog";
 import { useVoiceToText } from "@/hooks/useVoiceToText";
-import { isDyadProEnabled } from "@/lib/schemas";
-import { ipc } from "@/ipc/types";
 import { useCallback, useEffect } from "react";
 import { showError } from "@/lib/toast";
+import { useSelectedModelVisionSupport } from "@/hooks/useSelectedModelVisionSupport";
 
 export function HomeChatInput({
   onSubmit,
@@ -52,8 +50,6 @@ export function HomeChatInput({
     hasChatId: false,
   }); // eslint-disable-line @typescript-eslint/no-unused-vars
   useChatModeToggle();
-  const isProEnabled = settings ? isDyadProEnabled(settings) : false;
-
   const handleTranscription = useCallback(
     (text: string) => {
       setInputValue((prev: string) => (prev.trim() ? prev + " " + text : text));
@@ -62,7 +58,7 @@ export function HomeChatInput({
   );
 
   const { isRecording, isTranscribing, toggleRecording } = useVoiceToText({
-    enabled: isProEnabled,
+    enabled: true,
     onTranscription: handleTranscription,
     onError: (message) => showError(message),
   });
@@ -84,7 +80,7 @@ export function HomeChatInput({
   ]);
   const placeholder = selectedApp
     ? `Send a message to ${selectedApp.name}...`
-    : `Ask Dyad to build ${typingText ?? ""}`;
+    : `Ask Meowphyr to build ${typingText ?? ""}`;
 
   // Use the attachments hook
   const {
@@ -101,6 +97,8 @@ export function HomeChatInput({
     confirmPendingFiles,
     cancelPendingFiles,
   } = useAttachments();
+
+  const { modelSupportsVision } = useSelectedModelVisionSupport();
 
   const handleSelectApp = (appId: number) => {
     const app = apps.find((a) => a.id === appId);
@@ -122,6 +120,13 @@ export function HomeChatInput({
 
     if (isRecording) {
       await toggleRecording();
+    }
+
+    if (attachments.length > 0 && !modelSupportsVision) {
+      showError(
+        "The selected model does not support image input. Please remove the attachments or switch to a model with Vision enabled.",
+      );
+      return;
     }
 
     // Call the parent's onSubmit handler with attachments and selected app
@@ -163,6 +168,13 @@ export function HomeChatInput({
             onRemove={removeAttachment}
           />
 
+          {/* Vision not supported warning */}
+          {attachments.length > 0 && !modelSupportsVision && (
+            <div className="mx-3 mb-1 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              The selected model does not support image input. Remove the attachments or switch to a model with Vision enabled.
+            </div>
+          )}
+
           {/* Drag and drop overlay */}
           <DragDropOverlay isDraggingOver={isDraggingOver} />
 
@@ -187,64 +199,44 @@ export function HomeChatInput({
             />
 
             {/* Voice-to-text button */}
-            {isProEnabled ? (
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <button
-                      onClick={toggleRecording}
-                      disabled={isTranscribing}
-                      aria-label={
-                        isRecording
-                          ? "Stop recording"
-                          : isTranscribing
-                            ? "Transcribing..."
-                            : "Voice to text"
-                      }
-                      className={cn(
-                        "px-2 py-2 mb-0.5 text-muted-foreground rounded-lg transition-colors duration-150 cursor-pointer disabled:cursor-default disabled:opacity-30",
-                        isRecording &&
-                          "text-red-500 hover:text-red-600 animate-pulse",
-                        !isRecording && !isTranscribing && "hover:text-primary",
-                      )}
-                    />
-                  }
-                >
-                  {isTranscribing ? (
-                    <Loader2 size={20} className="animate-spin" />
-                  ) : isRecording ? (
-                    <MicOff size={20} />
-                  ) : (
-                    <Mic size={20} />
-                  )}
-                </TooltipTrigger>
-                <TooltipContent>
-                  {isRecording
-                    ? "Stop recording"
-                    : isTranscribing
-                      ? "Transcribing..."
-                      : "Voice to text"}
-                </TooltipContent>
-              </Tooltip>
-            ) : (
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <button
-                      onClick={() =>
-                        ipc.system.openExternalUrl("https://dyad.sh/pro")
-                      }
-                      aria-label="Voice to text"
-                      className="px-2 py-2 mb-0.5 text-muted-foreground hover:text-primary rounded-lg transition-colors duration-150 cursor-pointer relative"
-                    />
-                  }
-                >
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <button
+                    onClick={toggleRecording}
+                    disabled={isTranscribing}
+                    aria-label={
+                      isRecording
+                        ? "Stop recording"
+                        : isTranscribing
+                          ? "Transcribing..."
+                          : "Voice to text"
+                    }
+                    className={cn(
+                      "px-2 py-2 mb-0.5 text-muted-foreground rounded-lg transition-colors duration-150 cursor-pointer disabled:cursor-default disabled:opacity-30",
+                      isRecording &&
+                        "text-red-500 hover:text-red-600 animate-pulse",
+                      !isRecording && !isTranscribing && "hover:text-primary",
+                    )}
+                  />
+                }
+              >
+                {isTranscribing ? (
+                  <Loader2 size={20} className="animate-spin" />
+                ) : isRecording ? (
+                  <MicOff size={20} />
+                ) : (
                   <Mic size={20} />
-                  <Lock size={10} className="absolute -top-0.5 -right-0.5" />
-                </TooltipTrigger>
-                <TooltipContent>Voice to text</TooltipContent>
-              </Tooltip>
-            )}
+                )}
+              </TooltipTrigger>
+              <TooltipContent>
+                {isRecording
+                  ? "Stop recording"
+                  : isTranscribing
+                    ? "Transcribing..."
+                    : "Voice to text"}
+              </TooltipContent>
+            </Tooltip>
 
             {isStreaming ? (
               <Tooltip>

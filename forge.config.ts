@@ -92,8 +92,8 @@ const config: ForgeConfig = {
       : undefined,
     protocols: [
       {
-        name: "Dyad",
-        schemes: ["dyad"],
+        name: "Meowphyr",
+        schemes: ["meowphyr"],
       },
     ],
     icon: "./assets/icon/logo",
@@ -152,7 +152,7 @@ const config: ForgeConfig = {
     }),
     new MakerDeb({
       options: {
-        mimeType: ["x-scheme-handler/dyad"],
+        mimeType: ["x-scheme-handler/meowphyr"],
         icon: "./assets/icon/logo.png",
       },
     }),

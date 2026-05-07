@@ -84,6 +84,12 @@ describe("readSettings", () => {
       expect(scrubSettings(result)).toMatchInlineSnapshot(`
         {
           "autoExpandPreviewPanel": true,
+          "embeddingBaseUrl": "https://api.mistral.ai/v1",
+          "embeddingBatchSize": 60,
+          "embeddingModel": "codestral-embed-2505",
+          "embeddingScannerMaxRetries": 3,
+          "embeddingSearchMaxResults": 50,
+          "embeddingSearchMinScore": 0.4,
           "enableAutoFixProblems": false,
           "enableAutoUpdate": true,
           "enableContextCompaction": true,
@@ -92,6 +98,8 @@ describe("readSettings", () => {
           "enableProSmartFilesContextMode": true,
           "experiments": {},
           "hasRunBefore": false,
+          "imageGenerationBaseUrl": "https://api.openai.com/v1",
+          "imageGenerationModel": "gpt-image-1",
           "isRunning": false,
           "lastKnownPerformance": undefined,
           "previewIdleTimeoutPolicy": "default",
@@ -99,12 +107,12 @@ describe("readSettings", () => {
           "releaseChannel": "stable",
           "selectedChatMode": "build",
           "selectedModel": {
-            "name": "auto",
-            "provider": "auto",
+            "name": "gemini-3-flash-preview",
+            "provider": "google",
           },
           "selectedTemplateId": "react",
           "selectedThemeId": "default",
-          "telemetryConsent": "unset",
+          "telemetryConsent": "opted_out",
           "telemetryUserId": "[scrubbed]",
         }
       `);
@@ -477,6 +485,12 @@ describe("readSettings", () => {
       expect(scrubSettings(result)).toMatchInlineSnapshot(`
         {
           "autoExpandPreviewPanel": true,
+          "embeddingBaseUrl": "https://api.mistral.ai/v1",
+          "embeddingBatchSize": 60,
+          "embeddingModel": "codestral-embed-2505",
+          "embeddingScannerMaxRetries": 3,
+          "embeddingSearchMaxResults": 50,
+          "embeddingSearchMinScore": 0.4,
           "enableAutoFixProblems": false,
           "enableAutoUpdate": true,
           "enableContextCompaction": true,
@@ -485,6 +499,8 @@ describe("readSettings", () => {
           "enableProSmartFilesContextMode": true,
           "experiments": {},
           "hasRunBefore": false,
+          "imageGenerationBaseUrl": "https://api.openai.com/v1",
+          "imageGenerationModel": "gpt-image-1",
           "isRunning": false,
           "lastKnownPerformance": undefined,
           "previewIdleTimeoutPolicy": "default",
@@ -492,12 +508,12 @@ describe("readSettings", () => {
           "releaseChannel": "stable",
           "selectedChatMode": "build",
           "selectedModel": {
-            "name": "auto",
-            "provider": "auto",
+            "name": "gemini-3-flash-preview",
+            "provider": "google",
           },
           "selectedTemplateId": "react",
           "selectedThemeId": "default",
-          "telemetryConsent": "unset",
+          "telemetryConsent": "opted_out",
           "telemetryUserId": "[scrubbed]",
         }
       `);
@@ -511,8 +527,8 @@ describe("readSettings", () => {
 
       expect(result).toMatchObject({
         selectedModel: {
-          name: "auto",
-          provider: "auto",
+          name: "gemini-3-flash-preview",
+          provider: "google",
         },
         releaseChannel: "stable",
       });
@@ -534,8 +550,8 @@ describe("readSettings", () => {
 
       expect(result).toMatchObject({
         selectedModel: {
-          name: "auto",
-          provider: "auto",
+          name: "gemini-3-flash-preview",
+          provider: "google",
         },
         releaseChannel: "stable",
       });
@@ -559,8 +575,8 @@ describe("readSettings", () => {
 
       expect(result).toMatchObject({
         selectedModel: {
-          name: "auto",
-          provider: "auto",
+          name: "gemini-3-flash-preview",
+          provider: "google",
         },
         releaseChannel: "stable",
       });

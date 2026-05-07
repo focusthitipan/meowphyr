@@ -1,10 +1,17 @@
 import { z } from "zod";
 import log from "electron-log";
-import { ToolDefinition, escapeXmlContent, AgentContext } from "./types";
-import { engineFetch } from "./engine_fetch";
+import { ToolDefinition, escapeXmlContent, escapeXmlAttr } from "./types";
 import { DyadError, DyadErrorKind } from "@/errors/dyad_error";
+import { htmlToText } from "./html_utils";
 
 const logger = log.scope("web_fetch");
+
+const MAX_CONTENT_LENGTH = 80_000;
+
+function truncateContent(value: string): string {
+  if (value.length <= MAX_CONTENT_LENGTH) return value;
+  return `${value.slice(0, MAX_CONTENT_LENGTH)}\n\n<!-- truncated -->`;
+}
 
 function validateHttpUrl(url: string): void {
   let parsed: URL;
@@ -14,35 +21,18 @@ function validateHttpUrl(url: string): void {
     throw new DyadError(`Invalid URL: ${url}`, DyadErrorKind.Validation);
   }
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    throw new Error(
+    throw new DyadError(
       `Unsupported URL scheme "${parsed.protocol}" — only http and https are allowed`,
+      DyadErrorKind.Validation,
     );
   }
-}
-
-const MAX_CONTENT_LENGTH = 80_000;
-
-function truncateContent(value: string): string {
-  if (value.length <= MAX_CONTENT_LENGTH) return value;
-  return `${value.slice(0, MAX_CONTENT_LENGTH)}\n\n<!-- truncated -->`;
 }
 
 const webFetchSchema = z.object({
   url: z.string().describe("URL to fetch content from"),
 });
 
-const webFetchResponseSchema = z.object({
-  rootUrl: z.string(),
-  markdown: z.string().optional(),
-  pages: z.array(
-    z.object({
-      url: z.string(),
-      markdown: z.string(),
-    }),
-  ),
-});
-
-const DESCRIPTION = `Fetch and read the content of a web page as markdown given its URL.
+const DESCRIPTION = `Fetch and read the content of a web page as text given its URL.
 
 ### When to Use This Tool
 Use this tool when the user's message contains a URL (or domain name) and they want to:
@@ -61,24 +51,25 @@ Examples:
 - The user needs to **search the web** for information without a specific URL → use \`web_search\` instead
 `;
 
-async function callWebFetch(
-  url: string,
-  ctx: Pick<AgentContext, "dyadRequestId">,
-): Promise<z.infer<typeof webFetchResponseSchema>> {
-  const response = await engineFetch(ctx, "/tools/web-crawl", {
-    method: "POST",
-    body: JSON.stringify({ url, markdownOnly: true }),
+async function fetchPage(url: string): Promise<string> {
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (compatible; DyadBot/1.0; +https://dyad.sh)",
+      Accept: "text/html,application/xhtml+xml,*/*",
+    },
+    signal: AbortSignal.timeout(30_000),
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(
-      `Web fetch failed: ${response.status} ${response.statusText} - ${errorText}`,
+    throw new DyadError(
+      `Failed to fetch ${url}: HTTP ${response.status}`,
+      DyadErrorKind.External,
     );
   }
 
-  const data = webFetchResponseSchema.parse(await response.json());
-  return data;
+  const html = await response.text();
+  return htmlToText(html);
 }
 
 export const webFetchTool: ToolDefinition<z.infer<typeof webFetchSchema>> = {
@@ -86,17 +77,14 @@ export const webFetchTool: ToolDefinition<z.infer<typeof webFetchSchema>> = {
   description: DESCRIPTION,
   inputSchema: webFetchSchema,
   defaultConsent: "always",
-
-  // Requires Dyad Pro engine API
-  isEnabled: (ctx) => ctx.isDyadPro,
+  isEnabled: () => true,
 
   getConsentPreview: (args) => `Fetch URL: "${args.url}"`,
 
   buildXml: (args, isComplete) => {
     if (!args.url) return undefined;
-    // When complete, return undefined so execute's onXmlComplete provides the final XML
     if (isComplete) return undefined;
-    return `<dyad-web-fetch>${escapeXmlContent(args.url)}`;
+    return `<dyad-web-fetch url="${escapeXmlAttr(args.url)}">`;
   },
 
   execute: async (args, ctx) => {
@@ -104,42 +92,28 @@ export const webFetchTool: ToolDefinition<z.infer<typeof webFetchSchema>> = {
 
     validateHttpUrl(args.url);
 
-    ctx.onXmlStream(`<dyad-web-fetch>${escapeXmlContent(args.url)}`);
+    ctx.onXmlStream(`<dyad-web-fetch url="${escapeXmlAttr(args.url)}">`);
 
     try {
-      const result = await callWebFetch(args.url, ctx);
+      const content = await fetchPage(args.url);
 
-      if (!result) {
-        throw new DyadError(
-          "Web fetch returned no results",
-          DyadErrorKind.NotFound,
-        );
-      }
-
-      // Combine markdown from all pages
-      const allContent = result.pages
-        .map((page) => `## ${page.url}\n\n${page.markdown}`)
-        .join("\n\n---\n\n");
-
-      if (!allContent) {
+      if (!content) {
         throw new DyadError(
           "No content available from web fetch",
           DyadErrorKind.NotFound,
         );
       }
 
-      logger.log(
-        `Web fetch completed for URL: ${args.url} (${result.pages.length} pages)`,
-      );
+      logger.log(`Web fetch completed for URL: ${args.url}`);
 
       ctx.onXmlComplete(
-        `<dyad-web-fetch>${escapeXmlContent(args.url)}</dyad-web-fetch>`,
+        `<dyad-web-fetch url="${escapeXmlAttr(args.url)}">${escapeXmlContent(content)}</dyad-web-fetch>`,
       );
 
-      return truncateContent(allContent);
+      return truncateContent(`## ${args.url}\n\n${content}`);
     } catch (error) {
       ctx.onXmlComplete(
-        `<dyad-web-fetch>${escapeXmlContent(args.url)}</dyad-web-fetch>`,
+        `<dyad-web-fetch url="${escapeXmlAttr(args.url)}"></dyad-web-fetch>`,
       );
       throw error;
     }

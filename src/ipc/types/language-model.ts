@@ -32,6 +32,7 @@ export const LanguageModelSchema = z.object({
   temperature: z.number().optional(),
   dollarSigns: z.number().optional(),
   type: z.enum(["custom", "local", "cloud"]).optional(),
+  supportsVision: z.boolean().optional(),
 });
 
 export type LanguageModel = z.infer<typeof LanguageModelSchema>;
@@ -62,6 +63,7 @@ export const CreateCustomLanguageModelParamsSchema = z.object({
   description: z.string().optional(),
   maxOutputTokens: z.number().optional(),
   contextWindow: z.number().optional(),
+  supportsVision: z.boolean().optional(),
 });
 
 export type CreateCustomLanguageModelParams = z.infer<

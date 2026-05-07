@@ -5,8 +5,6 @@ import {
   Camera,
   Layers,
   Sparkles,
-  Lock,
-  Loader2,
 } from "lucide-react";
 import {
   Dialog,
@@ -21,11 +19,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useLoadApps } from "@/hooks/useLoadApps";
 import { useGenerateImage } from "@/hooks/useGenerateImage";
-import { useUserBudgetInfo } from "@/hooks/useUserBudgetInfo";
 import { useSettings } from "@/hooks/useSettings";
-import { AiAccessBanner } from "./ProBanner";
 import { AppSearchSelect } from "./AppSearchSelect";
-import { isDyadProEnabled } from "@/lib/schemas";
 import type { ImageThemeMode } from "@/ipc/types";
 
 const THEME_MODES: {
@@ -78,10 +73,6 @@ export function ImageGeneratorDialog({
   const { apps } = useLoadApps();
   const generateImage = useGenerateImage();
   const { settings } = useSettings();
-  const { userBudget, isLoadingUserBudget: isBudgetLoading } =
-    useUserBudgetInfo();
-  const isProEnabled = settings ? isDyadProEnabled(settings) : false;
-
   // Sync defaultAppId only when dialog opens (not while already open)
   useEffect(() => {
     if (open && defaultAppId != null) {
@@ -136,29 +127,8 @@ export function ImageGeneratorDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          {isBudgetLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : !isProEnabled ? (
-            <div className="space-y-4">
-              <div className="flex flex-col items-center justify-center py-8 px-4 border-2 border-dashed border-muted-foreground/25 rounded-lg bg-muted/10">
-                <Lock className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold text-center mb-2">
-                  AI Image Generator
-                </h3>
-                <p className="text-sm text-muted-foreground text-center max-w-md">
-                  Generate custom images using AI to use in your apps.
-                </p>
-                <p className="text-xs text-muted-foreground/70 mt-2">
-                  Pro-only feature
-                </p>
-              </div>
-              <AiAccessBanner />
-            </div>
-          ) : (
-            <>
-              {/* Prompt */}
+          <>
+            {/* Prompt */}
               <div className="space-y-2">
                 <Label htmlFor="image-prompt">Prompt</Label>
                 <Textarea
@@ -217,8 +187,7 @@ export function ImageGeneratorDialog({
                   onSelect={setTargetAppId}
                 />
               </div>
-            </>
-          )}
+          </>
         </div>
 
         <DialogFooter>

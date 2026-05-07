@@ -81,7 +81,7 @@ function getXmlAttributes(args: ListFilesArgs, count?: number, total?: number) {
 export const listFilesTool: ToolDefinition<ListFilesArgs> = {
   name: "list_files",
   description:
-    "List files in the application directory. By default, lists only the immediate directory contents. Use recursive=true to list all files recursively. Use include_ignored=true to include git-ignored and hidden paths; recursive ignored listings require directory to be set. Results are capped at 1000 paths.",
+    "List files in the application directory. By default, lists only the immediate directory contents. Use recursive=true to list all files recursively. Use include_ignored=true to include git-ignored and hidden paths (e.g. node_modules). IMPORTANT: combining include_ignored=true with recursive=true requires directory to be explicitly set to a non-root subdirectory (e.g. 'src') — omitting directory with this combination is not allowed and will throw an error. Results are capped at 1000 paths.",
   inputSchema: listFilesSchema,
   defaultConsent: "always",
 

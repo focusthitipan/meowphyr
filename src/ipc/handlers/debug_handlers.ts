@@ -1,4 +1,4 @@
-import { BrowserWindow, clipboard } from "electron";
+﻿import { BrowserWindow, clipboard } from "electron";
 import { platform, arch } from "os";
 import { readSettings } from "../../main/settings";
 import { createTypedHandler } from "./base";
@@ -63,7 +63,7 @@ async function getSystemDebugInfo({
     console.error("Failed to get node path:", err);
   }
 
-  // Get Dyad version from package.json
+  // Get Meowphyr version from package.json
   const packageJsonPath = path.resolve(__dirname, "..", "..", "package.json");
   let dyadVersion = "unknown";
   try {
@@ -275,7 +275,7 @@ export function registerDebugHandlers() {
     try {
       const settings = readSettings();
 
-      // Get Dyad version
+      // Get Meowphyr version
       const packageJsonPath = path.resolve(
         __dirname,
         "..",

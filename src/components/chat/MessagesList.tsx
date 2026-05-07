@@ -18,10 +18,7 @@ import { ipc } from "@/ipc/types";
 import { chatMessagesByIdAtom } from "@/atoms/chatAtoms";
 import { useLanguageModelProviders } from "@/hooks/useLanguageModelProviders";
 import { useSettings } from "@/hooks/useSettings";
-import { useUserBudgetInfo } from "@/hooks/useUserBudgetInfo";
-import { PromoMessage } from "./PromoMessage";
 import { isCancelledResponseContent } from "@/shared/chatCancellation";
-import { isDyadProEnabled } from "@/lib/schemas";
 
 interface MessagesListProps {
   messages: Message[];
@@ -48,7 +45,6 @@ interface FooterContext {
   appId: number | null;
   setMessagesById: ReturnType<typeof useSetAtom<typeof chatMessagesByIdAtom>>;
   settings: ReturnType<typeof useSettings>["settings"];
-  userBudget: ReturnType<typeof useUserBudgetInfo>["userBudget"];
   renderSetupBanner: () => React.ReactNode;
 }
 
@@ -72,11 +68,8 @@ function FooterComponent({ context }: { context?: FooterContext }) {
     appId,
     setMessagesById,
     settings,
-    userBudget,
     renderSetupBanner,
   } = context;
-  const isProEnabled = settings ? isDyadProEnabled(settings) : false;
-
   const questionnaireState =
     selectedChatId != null ? submittedChatIds.get(selectedChatId) : undefined;
 
@@ -253,14 +246,6 @@ function FooterComponent({ context }: { context?: FooterContext }) {
           </div>
         </div>
       )}
-      {isStreaming &&
-        !isProEnabled &&
-        !userBudget &&
-        messages.length > 0 && (
-          <PromoMessage
-            seed={messages.length * (appId ?? 1) * (selectedChatId ?? 1)}
-          />
-        )}
       <div ref={messagesEndRef} />
       {renderSetupBanner()}
     </>
@@ -278,7 +263,6 @@ export const MessagesList = forwardRef<HTMLDivElement, MessagesListProps>(
     const [isUndoLoading, setIsUndoLoading] = useState(false);
     const [isRetryLoading, setIsRetryLoading] = useState(false);
     const selectedChatId = useAtomValue(selectedChatIdAtom);
-    const { userBudget } = useUserBudgetInfo();
 
     // Virtualization only renders visible DOM elements, which creates issues for E2E tests:
     // 1. Off-screen logs don't exist in the DOM and can't be queried by test selectors
@@ -357,7 +341,6 @@ export const MessagesList = forwardRef<HTMLDivElement, MessagesListProps>(
         appId,
         setMessagesById,
         settings,
-        userBudget,
         renderSetupBanner,
       }),
       [
@@ -375,7 +358,6 @@ export const MessagesList = forwardRef<HTMLDivElement, MessagesListProps>(
         appId,
         setMessagesById,
         settings,
-        userBudget,
         renderSetupBanner,
       ],
     );

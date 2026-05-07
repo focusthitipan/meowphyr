@@ -10,18 +10,12 @@ import { queryKeys } from "@/lib/queryKeys";
 
 const TELEMETRY_CONSENT_KEY = "dyadTelemetryConsent";
 const TELEMETRY_USER_ID_KEY = "dyadTelemetryUserId";
-const DYAD_PRO_STATUS_KEY = "dyadProStatus";
-
 export function isTelemetryOptedIn() {
   return window.localStorage.getItem(TELEMETRY_CONSENT_KEY) === "opted_in";
 }
 
 export function getTelemetryUserId(): string | null {
   return window.localStorage.getItem(TELEMETRY_USER_ID_KEY);
-}
-
-export function isDyadProUser(): boolean {
-  return window.localStorage.getItem(DYAD_PRO_STATUS_KEY) === "true";
 }
 
 let isInitialLoad = false;
@@ -126,9 +120,4 @@ function processSettingsForTelemetry(settings: UserSettings) {
   } else {
     window.localStorage.removeItem(TELEMETRY_USER_ID_KEY);
   }
-  // Store Pro status for telemetry sampling
-  window.localStorage.setItem(
-    DYAD_PRO_STATUS_KEY,
-    hasDyadProKey(settings) ? "true" : "false",
-  );
 }

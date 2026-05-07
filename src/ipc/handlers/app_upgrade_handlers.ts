@@ -1,4 +1,4 @@
-import { createLoggedHandler } from "./safe_handle";
+﻿import { createLoggedHandler } from "./safe_handle";
 import log from "electron-log";
 import { AppUpgrade } from "@/ipc/types";
 import { db } from "../../db";
@@ -20,7 +20,7 @@ const availableUpgrades: Omit<AppUpgrade, "isNeeded">[] = [
     id: "component-tagger",
     title: "Enable select component to edit",
     description:
-      "Installs the Dyad component tagger Vite plugin and its dependencies.",
+      "Installs the Meowphyr component tagger Vite plugin and its dependencies.",
     manualUpgradeUrl: "https://dyad.sh/docs/upgrades/select-component",
   },
   {
@@ -191,7 +191,7 @@ async function applyComponentTagger(appPath: string) {
     await gitAddAll({ path: appPath });
     await gitCommit({
       path: appPath,
-      message: "[dyad] add Dyad component tagger",
+      message: "[dyad] add Meowphyr component tagger",
     });
     logger.info("Successfully committed changes");
   } catch (err) {

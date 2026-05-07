@@ -1,4 +1,4 @@
-import {
+﻿import {
   selectedAppIdAtom,
   appUrlAtom,
   appConsoleEntriesAtom,
@@ -74,11 +74,9 @@ import { cn } from "@/lib/utils";
 import { normalizePath } from "../../../shared/normalizePath";
 import { showError } from "@/lib/toast";
 import type { DeviceMode } from "@/lib/schemas";
-import { isDyadProEnabled } from "@/lib/schemas";
 import { queryKeys } from "@/lib/queryKeys";
 import { AnnotatorOnlyForPro } from "./AnnotatorOnlyForPro";
 import { useAttachments } from "@/hooks/useAttachments";
-import { useUserBudgetInfo } from "@/hooks/useUserBudgetInfo";
 import { Annotator } from "@/pro/ui/components/Annotator/Annotator";
 import { VisualEditingToolbar } from "./VisualEditingToolbar";
 import { resolvePreviewBrowserUrl } from "./previewBrowserUrl";
@@ -126,7 +124,7 @@ const ErrorBanner = ({ error, onDismiss, onAIFix }: ErrorBannerProps) => {
 
       {(isInternalDyadError || isSyncError) && (
         <div className="absolute top-1 right-1 p-1 bg-red-100 dark:bg-red-900 rounded-md text-xs font-medium text-red-700 dark:text-red-300">
-          {isSyncError ? "Cloud sync issue" : "Internal Dyad error"}
+          {isSyncError ? "Cloud sync issue" : "Internal error"}
         </div>
       )}
 
@@ -161,9 +159,9 @@ const ErrorBanner = ({ error, onDismiss, onAIFix }: ErrorBannerProps) => {
             {isDockerError
               ? "Make sure Docker Desktop is running and try restarting the app."
               : isSyncError
-                ? "Dyad could not upload your latest local changes to the cloud sandbox. Check your network connection or wait for sync to recover."
+                ? "Meowphyr could not upload your latest local changes to the cloud sandbox. Check your network connection or wait for sync to recover."
                 : isInternalDyadError
-                  ? "Try restarting the Dyad app or restarting your computer to see if that fixes the error."
+                  ? "Try restarting the Meowphyr app or restarting your computer to see if that fixes the error."
                   : "Check if restarting the app fixes the error."}
           </span>
         </div>
@@ -206,8 +204,7 @@ export const PreviewIframe = ({ loading }: { loading: boolean }) => {
   } = useParseRouter(selectedAppId);
   const { restartApp } = useRunApp();
   const { settings, updateSettings } = useSettings();
-  const { userBudget } = useUserBudgetInfo();
-  const isProMode = settings ? isDyadProEnabled(settings) : false;
+  const isProMode = true;
   const queryClient = useQueryClient();
 
   // Preserved URL state (persists across HMR-induced remounts)
@@ -454,14 +451,14 @@ export const PreviewIframe = ({ loading }: { loading: boolean }) => {
     ) {
       setErrorMessage({
         message: cloudSandboxStatus.lastErrorMessage
-          ? cloudSandboxStatus.lastErrorMessage.includes("Dyad stopped")
+          ? cloudSandboxStatus.lastErrorMessage.includes("Meowphyr stopped")
             ? cloudSandboxStatus.lastErrorMessage
             : cloudSandboxStatus.terminationReason === "credits_exhausted"
-              ? "This cloud sandbox was stopped because your Dyad Pro credits ran out. Add credits and start it again."
-              : "This cloud sandbox was stopped because Dyad could not confirm billing. Please try starting it again."
+              ? "This cloud sandbox was stopped because your Meowphyr Pro credits ran out. Add credits and start it again."
+              : "This cloud sandbox was stopped because Meowphyr could not confirm billing. Please try starting it again."
           : cloudSandboxStatus.terminationReason === "credits_exhausted"
-            ? "This cloud sandbox was stopped because your Dyad Pro credits ran out. Add credits and start it again."
-            : "This cloud sandbox was stopped because Dyad could not confirm billing. Please try starting it again.",
+            ? "This cloud sandbox was stopped because your Meowphyr Pro credits ran out. Add credits and start it again."
+            : "This cloud sandbox was stopped because Meowphyr could not confirm billing. Please try starting it again.",
         source: "dyad-app",
       });
     }
@@ -491,20 +488,6 @@ export const PreviewIframe = ({ loading }: { loading: boolean }) => {
     );
   }, [cloudSandboxStatus, isCloudMode, setErrorMessage]);
 
-  useEffect(() => {
-    if (!isCloudMode || !cloudSandboxStatus) {
-      return;
-    }
-
-    void queryClient.invalidateQueries({
-      queryKey: queryKeys.userBudget.info,
-    });
-  }, [
-    cloudSandboxStatus?.billingSlicesCharged,
-    cloudSandboxStatus?.terminationReason,
-    isCloudMode,
-    queryClient,
-  ]);
 
   const analyzeComponent = async (componentId: string) => {
     if (!componentId || !selectedAppId) return;

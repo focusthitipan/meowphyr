@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+﻿import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   $getRoot,
   $createParagraphNode,
@@ -22,6 +22,7 @@ import {
 import { KEY_ENTER_COMMAND, COMMAND_PRIORITY_HIGH } from "lexical";
 import { useLoadApps } from "@/hooks/useLoadApps";
 import { usePrompts } from "@/hooks/usePrompts";
+import { useSkills } from "@/hooks/useSkills";
 import { useAppMediaFiles } from "@/hooks/useAppMediaFiles";
 import { forwardRef } from "react";
 import { useAtomValue } from "jotai";
@@ -49,6 +50,7 @@ const CustomMenuItem = forwardRef<
   const isApp = item.data?.type === "app";
   const isHistory = item.data?.type === "history";
   const isMedia = item.data?.type === "media";
+  const isFileSkill = isSkill && item.data?.source === "global";
   const label = isSkill
     ? "Skill"
     : isPrompt
@@ -61,6 +63,7 @@ const CustomMenuItem = forwardRef<
             ? "Media"
             : "File";
   const value = (item as any)?.value;
+  const argumentHint: string | null = item.data?.argumentHint ?? null;
 
   // For history items, show full text without label
   if (isHistory) {
@@ -103,7 +106,19 @@ const CustomMenuItem = forwardRef<
         >
           {label}
         </span>
-        <span className="truncate text-sm">{value}</span>
+        {isFileSkill && (
+          <span className="px-1.5 py-0.5 text-xs rounded border border-border text-muted-foreground flex-shrink-0">
+            file
+          </span>
+        )}
+        <div className="flex flex-col min-w-0">
+          <span className="truncate text-sm">{value}</span>
+          {argumentHint && (
+            <span className="truncate text-xs text-muted-foreground">
+              {argumentHint}
+            </span>
+          )}
+        </div>
       </div>
     </li>
   );
@@ -306,13 +321,14 @@ export function LexicalChatInput({
   onSubmit,
   onPaste,
   excludeCurrentApp,
-  placeholder = "Ask Dyad to build...",
+  placeholder = "Ask Meowphyr to build...",
   disabled = false,
   disableSendButton,
   messageHistory = [],
 }: LexicalChatInputProps) {
   const { apps } = useLoadApps();
   const { prompts } = usePrompts();
+  const { skills } = useSkills();
   const { mediaApps } = useAppMediaFiles();
   const [shouldClear, setShouldClear] = useState(false);
   const historyTriggerActiveRef = useRef(false);
@@ -339,14 +355,15 @@ export function LexicalChatInput({
       }));
     result[HISTORY_TRIGGER] = historyItems;
 
-    // Skills (slash commands): all prompts by slug
-    const skillItems = (prompts || [])
-      .map((p) => ({
-        value: slugForPrompt(p),
+    // Skills (slash commands): DB prompts-with-slug + global file skills
+    const skillItems = (skills || [])
+      .filter((s) => s.userInvocable !== false)
+      .map((s) => ({
+        value: s.slug,
         type: "skill",
-        id: p.id,
-      }))
-      .filter((item) => item.value != null && item.value !== "");
+        source: s.source,
+        argumentHint: s.argumentHint,
+      }));
     result["/"] = skillItems;
 
     if (!apps) return result;
@@ -407,6 +424,7 @@ export function LexicalChatInput({
     value,
     excludeCurrentApp,
     prompts,
+    skills,
     appFiles,
     messageHistory,
     mediaApps,

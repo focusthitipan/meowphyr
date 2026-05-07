@@ -1,4 +1,7 @@
-import { createLoggedHandler } from "../../../../ipc/handlers/safe_handle";
+﻿import { createLoggedHandler } from "../../../../ipc/handlers/safe_handle";
+import { createTypedHandler } from "../../../../ipc/handlers/base";
+import { templateContracts } from "@/ipc/types/templates";
+import { safeSend } from "../../../../ipc/utils/safe_sender";
 import log from "electron-log";
 import path from "path";
 import os from "os";
@@ -13,7 +16,6 @@ import { readSettings } from "../../../../main/settings";
 import { IS_TEST_BUILD } from "@/ipc/utils/test_utils";
 import { getModelClient } from "../../../../ipc/utils/get_model_client";
 import { cancelOrphanedBaseStream } from "../../../../ipc/utils/stream_text_utils";
-import { v4 as uuidv4 } from "uuid";
 import type {
   SetAppThemeParams,
   GetAppThemeParams,
@@ -21,15 +23,11 @@ import type {
   CreateCustomThemeParams,
   UpdateCustomThemeParams,
   DeleteCustomThemeParams,
-  GenerateThemePromptParams,
-  GenerateThemePromptResult,
-  GenerateThemeFromUrlParams,
   SaveThemeImageParams,
   SaveThemeImageResult,
   CleanupThemeImagesParams,
   ThemeGenerationModelOption,
 } from "@/ipc/types";
-import { webCrawlResponseSchema } from "./local_agent/tools/web_crawl";
 import {
   resolveBuiltinModelAlias,
 } from "@/ipc/shared/remote_language_model_catalog";
@@ -38,8 +36,8 @@ import {
   getLanguageModels,
 } from "@/ipc/shared/language_model_helpers";
 import { DyadError, DyadErrorKind } from "@/errors/dyad_error";
+import { BrowserWindow } from "electron";
 import {
-  isDyadProEnabled,
   type UserSettings,
   type AzureProviderSetting,
   type VertexProviderSetting,
@@ -93,7 +91,9 @@ async function resolveModelParam(
   }
 
   // Try direct provider::model format
-  const separatorIdx = model.indexOf("::");
+  // Use lastIndexOf so custom provider IDs (e.g. "custom::my-provider::model")
+  // are split correctly into provider "custom::my-provider" and model "model".
+  const separatorIdx = model.lastIndexOf("::");
   if (separatorIdx !== -1) {
     const providerId = model.slice(0, separatorIdx);
     const apiName = model.slice(separatorIdx + 2);
@@ -333,6 +333,67 @@ REQUIRED STRUCTURE
 - Self-Check
 `;
 
+/**
+ * Crawls a URL using a hidden Electron BrowserWindow.
+ * Returns rendered page text and a PNG screenshot (base64).
+ */
+async function crawlWithElectron(
+  url: string,
+): Promise<{ markdown: string; screenshot: string }> {
+  return new Promise((resolve, reject) => {
+    const win = new BrowserWindow({
+      width: 1280,
+      height: 900,
+      show: false,
+      webPreferences: {
+        javascript: true,
+        images: true,
+        contextIsolation: true,
+      },
+    });
+
+    const timeout = setTimeout(() => {
+      win.destroy();
+      reject(
+        new Error(
+          "Website crawl timed out. The website may be too slow or unresponsive.",
+        ),
+      );
+    }, WEB_CRAWL_TIMEOUT_MS);
+
+    win.webContents.on("did-finish-load", async () => {
+      try {
+        clearTimeout(timeout);
+        const image = await win.webContents.capturePage();
+        const screenshot = image.toPNG().toString("base64");
+        const text: string = await win.webContents.executeJavaScript(
+          "document.documentElement.innerText",
+        );
+        win.destroy();
+        resolve({ markdown: text, screenshot });
+      } catch (err) {
+        win.destroy();
+        reject(err);
+      }
+    });
+
+    win.webContents.on(
+      "did-fail-load",
+      (_event, _code, errorDescription) => {
+        clearTimeout(timeout);
+        win.destroy();
+        reject(new Error(`Failed to load website: ${errorDescription}`));
+      },
+    );
+
+    win.loadURL(url).catch((err) => {
+      clearTimeout(timeout);
+      win.destroy();
+      reject(err);
+    });
+  });
+}
+
 export function registerThemesHandlers() {
   // Get built-in themes
   handle("get-themes", async (): Promise<Theme[]> => {
@@ -392,7 +453,7 @@ export function registerThemesHandlers() {
       const options: ThemeGenerationModelOption[] = [];
 
       for (const provider of allProviders) {
-        // Skip local providers (ollama, lmstudio) and Dyad Pro
+        // Skip local providers (ollama, lmstudio) and Meowphyr Pro
         if (provider.type === "local" || provider.id === "auto") continue;
 
         // Only include providers that have credentials in settings
@@ -404,6 +465,9 @@ export function registerThemesHandlers() {
           options.push({
             id: `${provider.id}::${model.apiName}`,
             label: `${provider.name} / ${model.displayName}`,
+            providerId: provider.id,
+            providerName: provider.name,
+            supportsVision: model.supportsVision ?? false,
           });
         }
       }
@@ -676,54 +740,30 @@ export function registerThemesHandlers() {
     },
   );
 
-  handle(
-    "generate-theme-prompt",
-    async (
-      _,
-      params: GenerateThemePromptParams,
-    ): Promise<GenerateThemePromptResult> => {
+  createTypedHandler(
+    templateContracts.generateThemePrompt,
+    async (event, params) => {
+      const { sessionId } = params;
       const settings = readSettings();
 
-      // Return mock response in test mode
-      if (IS_TEST_BUILD) {
-        return {
-          prompt: `<theme>
-# Test Mode Theme
-
-## Visual Objective
-Modern dark theme with purple accents for testing.
-
-</theme>`,
-        };
-      }
-
-      if (!isDyadProEnabled(settings)) {
-        throw new Error(
-          "Dyad Pro is required for AI theme generation. Please enable Dyad Pro in Settings.",
-        );
-      }
-
-      // Validate inputs - image paths are required
       if (params.imagePaths.length === 0) {
         throw new DyadError(
           "Please upload at least one image to generate a theme",
           DyadErrorKind.External,
         );
       }
-
       if (params.imagePaths.length > 5) {
-        throw new DyadError("Maximum 5 images allowed", DyadErrorKind.External);
+        throw new DyadError(
+          "Maximum 5 images allowed",
+          DyadErrorKind.External,
+        );
       }
-
-      // Validate keywords length
       if (params.keywords.length > 500) {
         throw new DyadError(
           "Keywords must be less than 500 characters",
           DyadErrorKind.Validation,
         );
       }
-
-      // Validate generation mode
       if (!["inspired", "high-fidelity"].includes(params.generationMode)) {
         throw new DyadError(
           "Invalid generation mode",
@@ -731,132 +771,112 @@ Modern dark theme with purple accents for testing.
         );
       }
 
-      // Validate and map model selection
-      const selectedModel = await resolveModelParam(params.model);
-      if (!selectedModel) {
-        throw new Error(
-          `Invalid model selection: "${params.model}" could not be resolved`,
-        );
-      }
+      (async () => {
+        try {
+          if (IS_TEST_BUILD) {
+            const mockPrompt = `<theme>\n# Test Mode Theme\n\n## Visual Objective\nModern dark theme with purple accents for testing.\n\n</theme>`;
+            safeSend(event.sender, "theme:generate:chunk", {
+              sessionId,
+              delta: mockPrompt,
+              type: "text",
+            });
+            safeSend(event.sender, "theme:generate:end", { sessionId });
+            return;
+          }
 
-      // Use the selected model for theme generation
-      const { modelClient } = await getModelClient(
-        {
-          provider: selectedModel.providerId,
-          name: selectedModel.apiName,
-        },
-        settings,
-      );
-
-      // Select system prompt based on generation mode
-      const systemPrompt =
-        params.generationMode === "high-fidelity"
-          ? HIGH_FIDELITY_META_PROMPT
-          : THEME_GENERATION_META_PROMPT;
-
-      // Build the user input prompt (sanitize user-provided keywords)
-      const keywordsPart = sanitizeKeywords(params.keywords) || "N/A";
-      const imagesPart =
-        params.imagePaths.length > 0
-          ? `${params.imagePaths.length} image(s) attached`
-          : "N/A";
-      const userInput = `inspired by: ${keywordsPart}
-images: ${imagesPart}`;
-
-      // Generate theme with images - read from file paths
-      try {
-        const contentParts: (TextPart | ImagePart)[] = [];
-
-        // Add user input text first
-        contentParts.push({ type: "text", text: userInput });
-
-        // Read images from file paths and add to content
-        for (const imagePath of params.imagePaths) {
-          // Security: validate path is in our temp directory
-          // Use path.resolve() to normalize and prevent path traversal attacks
-          const normalizedImagePath = path.resolve(imagePath);
-          const normalizedTempDir = path.resolve(THEME_IMAGES_TEMP_DIR);
-          if (!normalizedImagePath.startsWith(normalizedTempDir + path.sep)) {
+          const selectedModel = await resolveModelParam(params.model);
+          if (!selectedModel) {
             throw new Error(
-              "Invalid image path: images must be uploaded through the theme dialog",
+              `Invalid model selection: "${params.model}" could not be resolved`,
             );
           }
 
-          try {
-            const imageBuffer = await readFile(imagePath);
+          const { modelClient } = await getModelClient(
+            { provider: selectedModel.providerId, name: selectedModel.apiName },
+            settings,
+          );
+
+          const systemPrompt =
+            params.generationMode === "high-fidelity"
+              ? HIGH_FIDELITY_META_PROMPT
+              : THEME_GENERATION_META_PROMPT;
+
+          const keywordsPart = sanitizeKeywords(params.keywords) || "N/A";
+          const imagesPart = `${params.imagePaths.length} image(s) attached`;
+          const userInput = `inspired by: ${keywordsPart}\nimages: ${imagesPart}`;
+
+          const contentParts: (TextPart | ImagePart)[] = [
+            { type: "text", text: userInput },
+          ];
+
+          for (const imagePath of params.imagePaths) {
+            const normalizedImagePath = path.resolve(imagePath);
+            const normalizedTempDir = path.resolve(THEME_IMAGES_TEMP_DIR);
+            if (
+              !normalizedImagePath.startsWith(normalizedTempDir + path.sep)
+            ) {
+              throw new Error(
+                "Invalid image path: images must be uploaded through the theme dialog",
+              );
+            }
+            const imageBuffer = await readFile(imagePath).catch(() => {
+              throw new Error(
+                `Failed to read image file: ${path.basename(imagePath)}`,
+              );
+            });
             const base64Data = imageBuffer.toString("base64");
             const ext = path.extname(imagePath).toLowerCase();
-            const mimeType = getMimeTypeFromExtension(ext);
-
             contentParts.push({
               type: "image",
               image: base64Data,
-              mimeType,
+              mimeType: getMimeTypeFromExtension(ext),
             } as ImagePart);
-          } catch {
-            throw new Error(
-              `Failed to read image file: ${path.basename(imagePath)}`,
-            );
           }
+
+          const stream = streamText({
+            model: modelClient.model,
+            system: systemPrompt,
+            maxRetries: 1,
+            messages: [{ role: "user", content: contentParts }],
+          });
+
+          const fullStream = stream.fullStream;
+          cancelOrphanedBaseStream(stream);
+
+          for await (const part of fullStream) {
+            if (part.type === "text-delta") {
+              safeSend(event.sender, "theme:generate:chunk", {
+                sessionId,
+                delta: part.text,
+                type: "text",
+              });
+            }
+          }
+
+          safeSend(event.sender, "theme:generate:end", { sessionId });
+        } catch (err) {
+          logger.error("generate-theme-prompt stream error", err);
+          safeSend(event.sender, "theme:generate:error", {
+            sessionId,
+            error:
+              err instanceof Error
+                ? err.message
+                : "Failed to process images for theme generation. Please try with fewer or smaller images, or use manual mode.",
+          });
         }
+      })();
 
-        const stream = streamText({
-          model: modelClient.model,
-          system: systemPrompt,
-          maxRetries: 1,
-          messages: [{ role: "user", content: contentParts }],
-        });
-
-        // Read .textStream now (not lazily) so the SDK's tee runs
-        // synchronously, then cancel the orphaned branch before any
-        // chunks are pumped. `await stream.text` would internally
-        // consume `.fullStream` and leave the orphan queueing the
-        // whole response.
-        const textStream = stream.textStream;
-        cancelOrphanedBaseStream(stream);
-        let result = "";
-        for await (const chunk of textStream) result += chunk;
-
-        return { prompt: result };
-      } catch (error) {
-        throw new Error(
-          error instanceof Error
-            ? error.message
-            : "Failed to process images for theme generation. Please try with fewer or smaller images, or use manual mode.",
-        );
-      }
+      return { ok: true } as const;
     },
   );
 
   // Generate theme prompt from website URL via web crawl
-  handle(
-    "generate-theme-from-url",
-    async (
-      _,
-      params: GenerateThemeFromUrlParams,
-    ): Promise<GenerateThemePromptResult> => {
-      const settings = readSettings();
+  createTypedHandler(
+    templateContracts.generateThemeFromUrl,
+    async (event, params) => {
+      const { sessionId } = params;
 
-      // Return mock response in test mode
-      if (IS_TEST_BUILD) {
-        return {
-          prompt: `<theme>
-# Test Mode Theme (from URL)
-
-## Visual Objective
-Modern theme extracted from website for testing.
-
-</theme>`,
-        };
-      }
-
-      if (!isDyadProEnabled(settings)) {
-        throw new Error(
-          "Dyad Pro is required for AI theme generation. Please enable Dyad Pro in Settings.",
-        );
-      }
-
-      // Validate URL format and protocol
+      // Synchronous validation — throws before fire-and-forget
       let parsedUrl: URL;
       try {
         parsedUrl = new URL(params.url);
@@ -867,14 +887,12 @@ Modern theme extracted from website for testing.
         );
       }
 
-      // Only allow HTTP/HTTPS protocols (security: prevent file://, javascript://, etc.)
       if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
         throw new Error(
           "Invalid URL protocol. Only HTTP and HTTPS URLs are supported.",
         );
       }
 
-      // SSRF protection: block internal/private network addresses
       const hostname = parsedUrl.hostname.toLowerCase();
       const blockedPatterns = [
         /^localhost$/i,
@@ -893,7 +911,6 @@ Modern theme extracted from website for testing.
         );
       }
 
-      // Validate keywords length
       if (params.keywords.length > 500) {
         throw new DyadError(
           "Keywords must be less than 500 characters",
@@ -901,7 +918,6 @@ Modern theme extracted from website for testing.
         );
       }
 
-      // Validate generation mode
       if (!["inspired", "high-fidelity"].includes(params.generationMode)) {
         throw new DyadError(
           "Invalid generation mode",
@@ -909,161 +925,130 @@ Modern theme extracted from website for testing.
         );
       }
 
-      // Validate and map model selection
-      const selectedModel = await resolveModelParam(params.model);
-      if (!selectedModel) {
-        throw new Error(
-          `Invalid model selection: "${params.model}" could not be resolved`,
-        );
-      }
+      (async () => {
+        try {
+          if (IS_TEST_BUILD) {
+            const mockPrompt = `<theme>\n# Test Mode Theme (from URL)\n\n## Visual Objective\nModern theme extracted from website for testing.\n\n</theme>`;
+            safeSend(event.sender, "theme:url-generate:chunk", {
+              sessionId,
+              delta: mockPrompt,
+              type: "text",
+            });
+            safeSend(event.sender, "theme:url-generate:end", { sessionId });
+            return;
+          }
 
-      // Get API key for Dyad Engine
-      const apiKey = settings.providerSettings?.auto?.apiKey?.value;
-      if (!apiKey) {
-        throw new DyadError("Dyad Pro API key is required", DyadErrorKind.Auth);
-      }
+          const selectedModel = await resolveModelParam(params.model);
+          if (!selectedModel) {
+            throw new Error(
+              `Invalid model selection: "${params.model}" could not be resolved`,
+            );
+          }
 
-      // Crawl the website
-      logger.log(`Crawling website for theme: ${params.url}`);
+          // Crawl phase — emit status so UI shows progress during the long wait
+          logger.log(`Crawling website for theme: ${params.url}`);
+          safeSend(event.sender, "theme:url-generate:chunk", {
+            sessionId,
+            delta: `Crawling ${params.url}...`,
+            type: "status",
+          });
 
-      const DYAD_ENGINE_URL =
-        process.env.DYAD_ENGINE_URL ?? "https://engine.dyad.sh/v1";
+          let crawlResult: { markdown: string; screenshot: string };
+          try {
+            crawlResult = await crawlWithElectron(params.url);
+          } catch (error) {
+            throw new Error(
+              error instanceof Error
+                ? error.message
+                : `Failed to crawl website: ${String(error)}`,
+            );
+          }
 
-      // Create AbortController for timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(
-        () => controller.abort(),
-        WEB_CRAWL_TIMEOUT_MS,
-      );
+          if (!crawlResult.markdown) {
+            throw new Error(
+              "Failed to extract website content. Please try a different URL.",
+            );
+          }
 
-      let crawlResponse: Response;
-      try {
-        crawlResponse = await fetch(`${DYAD_ENGINE_URL}/tools/web-crawl`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
-            "X-Dyad-Request-Id": `theme-crawl-${uuidv4()}`,
-          },
-          body: JSON.stringify({ url: params.url }),
-          signal: controller.signal,
-        });
-      } catch (error) {
-        if (error instanceof Error && error.name === "AbortError") {
-          throw new Error(
-            "Website crawl timed out. The website may be too slow or unresponsive.",
+          logger.log(`Website crawled successfully: ${params.url}`);
+
+          // Generating phase — notify UI that crawl is done
+          safeSend(event.sender, "theme:url-generate:chunk", {
+            sessionId,
+            delta: "Analyzing design system...",
+            type: "status",
+          });
+
+          const settings = readSettings();
+          const { modelClient } = await getModelClient(
+            { provider: selectedModel.providerId, name: selectedModel.apiName },
+            settings,
           );
+
+          const systemPrompt =
+            params.generationMode === "high-fidelity"
+              ? WEB_CRAWL_HIGH_FIDELITY_META_PROMPT
+              : WEB_CRAWL_THEME_GENERATION_META_PROMPT;
+
+          const keywordsPart = sanitizeKeywords(params.keywords) || "N/A";
+          const userInput = `inspired by: ${keywordsPart}\nsource: Live website (screenshot and content provided)`;
+
+          const MAX_MARKDOWN_LENGTH = 16000;
+          const truncatedMarkdown =
+            crawlResult.markdown.length > MAX_MARKDOWN_LENGTH
+              ? crawlResult.markdown.slice(0, MAX_MARKDOWN_LENGTH) +
+                "\n<!-- truncated -->"
+              : crawlResult.markdown;
+
+          const sanitizedMarkdown = sanitizeForPrompt(truncatedMarkdown);
+
+          const contentParts: (TextPart | ImagePart)[] = [
+            { type: "text", text: userInput },
+            {
+              type: "image",
+              image: crawlResult.screenshot,
+              mimeType: "image/png",
+            } as ImagePart,
+            {
+              type: "text",
+              text: `Website content (text):\n\`\`\`\n${sanitizedMarkdown}\n\`\`\``,
+            },
+          ];
+
+          const stream = streamText({
+            model: modelClient.model,
+            system: systemPrompt,
+            maxRetries: 1,
+            messages: [{ role: "user", content: contentParts }],
+          });
+
+          const fullStream = stream.fullStream;
+          cancelOrphanedBaseStream(stream);
+
+          for await (const part of fullStream) {
+            if (part.type === "text-delta") {
+              safeSend(event.sender, "theme:url-generate:chunk", {
+                sessionId,
+                delta: part.text,
+                type: "text",
+              });
+            }
+          }
+
+          safeSend(event.sender, "theme:url-generate:end", { sessionId });
+        } catch (err) {
+          logger.error("generate-theme-from-url stream error", err);
+          safeSend(event.sender, "theme:url-generate:error", {
+            sessionId,
+            error:
+              err instanceof Error
+                ? err.message
+                : "Failed to generate theme from website. Please try again.",
+          });
         }
-        throw new Error(
-          "Failed to connect to crawl service. Please check your internet connection and try again.",
-        );
-      } finally {
-        clearTimeout(timeoutId);
-      }
+      })();
 
-      if (!crawlResponse.ok) {
-        const errorText = await crawlResponse.text();
-        throw new Error(
-          `Failed to crawl website: ${crawlResponse.status} - ${errorText}`,
-        );
-      }
-
-      // Validate response with Zod schema
-      const rawCrawlResult = await crawlResponse.json();
-      const parseResult = webCrawlResponseSchema.safeParse(rawCrawlResult);
-      if (!parseResult.success) {
-        logger.error("Invalid crawl response structure:", parseResult.error);
-        throw new Error(
-          "Received invalid response from crawl service. Please try again.",
-        );
-      }
-      const crawlResult = parseResult.data;
-
-      if (!crawlResult.screenshot) {
-        throw new Error(
-          "Failed to capture website screenshot. Please try a different URL.",
-        );
-      }
-
-      if (!crawlResult.markdown) {
-        throw new Error(
-          "Failed to extract website content. Please try a different URL.",
-        );
-      }
-
-      logger.log(`Website crawled successfully: ${params.url}`);
-
-      // Use the selected model for theme generation
-      const { modelClient } = await getModelClient(
-        {
-          provider: selectedModel.providerId,
-          name: selectedModel.apiName,
-        },
-        settings,
-      );
-
-      // Select system prompt based on generation mode
-      const systemPrompt =
-        params.generationMode === "high-fidelity"
-          ? WEB_CRAWL_HIGH_FIDELITY_META_PROMPT
-          : WEB_CRAWL_THEME_GENERATION_META_PROMPT;
-
-      // Build the user input prompt (sanitize user-provided keywords)
-      const keywordsPart = sanitizeKeywords(params.keywords) || "N/A";
-      const userInput = `inspired by: ${keywordsPart}
-source: Live website (screenshot and content provided)`;
-
-      // Truncate markdown if too long (consistent with existing web_crawl.ts)
-      const MAX_MARKDOWN_LENGTH = 16000;
-      const truncatedMarkdown =
-        crawlResult.markdown.length > MAX_MARKDOWN_LENGTH
-          ? crawlResult.markdown.slice(0, MAX_MARKDOWN_LENGTH) +
-            "\n<!-- truncated -->"
-          : crawlResult.markdown;
-
-      // Sanitize crawled content to prevent prompt injection
-      const sanitizedMarkdown = sanitizeForPrompt(truncatedMarkdown);
-
-      // Build content parts
-      const contentParts: (TextPart | ImagePart)[] = [
-        { type: "text", text: userInput },
-        {
-          type: "image",
-          image: crawlResult.screenshot,
-          mimeType: "image/png",
-        } as ImagePart,
-        {
-          type: "text",
-          text: `Website content (markdown):\n\`\`\`markdown\n${sanitizedMarkdown}\n\`\`\``,
-        },
-      ];
-
-      try {
-        const stream = streamText({
-          model: modelClient.model,
-          system: systemPrompt,
-          maxRetries: 1,
-          messages: [{ role: "user", content: contentParts }],
-        });
-
-        // Read .textStream now (not lazily) so the SDK's tee runs
-        // synchronously, then cancel the orphaned branch before any
-        // chunks are pumped. `await stream.text` would internally
-        // consume `.fullStream` and leave the orphan queueing the
-        // whole response.
-        const textStream = stream.textStream;
-        cancelOrphanedBaseStream(stream);
-        let result = "";
-        for await (const chunk of textStream) result += chunk;
-
-        return { prompt: result };
-      } catch (error) {
-        throw new Error(
-          error instanceof Error
-            ? error.message
-            : "Failed to generate theme from website. Please try again.",
-        );
-      }
+      return { ok: true } as const;
     },
   );
 }

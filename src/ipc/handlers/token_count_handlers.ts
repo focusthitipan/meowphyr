@@ -28,7 +28,6 @@ import { readSettings } from "@/main/settings";
 import { extractMentionedAppsCodebases } from "../utils/mention_apps";
 import { parseAppMentions } from "@/shared/parse_mention_apps";
 import {
-  isDyadProEnabled,
   isLocalAgentBackedMode,
   isTurboEditsV2Enabled,
 } from "@/lib/schemas";
@@ -136,7 +135,7 @@ export function registerTokenCountHandlers() {
           chatContext: validateChatContext(chat.app.chatContext),
         });
         codebaseInfo = formattedOutput;
-        if (isDyadProEnabled(settings) && settings.enableProSmartFilesContextMode) {
+        if (settings.enableProSmartFilesContextMode) {
           codebaseTokens = estimateTokens(
             files
               // It doesn't need to be the exact format but it's just to get a token estimate

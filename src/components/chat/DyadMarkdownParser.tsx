@@ -1,4 +1,4 @@
-import React, { useDeferredValue, useMemo } from "react";
+﻿import React, { useDeferredValue, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -45,6 +45,7 @@ import { DyadExitPlan } from "./DyadExitPlan";
 import { DyadQuestionnaire } from "./DyadQuestionnaire";
 import { DyadStepLimit } from "./DyadStepLimit";
 import { DyadReadGuide } from "./DyadReadGuide";
+import { DyadSkill } from "./DyadSkill";
 import { mapActionToButton } from "./ChatInput";
 import { SuggestedAction } from "@/lib/schemas";
 import { FixAllErrorsButton } from "./FixAllErrorsButton";
@@ -85,6 +86,7 @@ const DYAD_CUSTOM_TAGS = [
   "dyad-neon-project-info",
   "dyad-neon-table-schema",
   "dyad-read-guide",
+  "dyad-skill",
   "dyad-status",
   "dyad-compaction",
   "dyad-copy",
@@ -147,7 +149,7 @@ export const VanillaMarkdownParser = ({ content }: { content: string }) => {
 };
 
 /**
- * Custom component to parse markdown content with Dyad-specific tags
+ * Custom component to parse markdown content with Meowphyr-specific tags
  */
 export const DyadMarkdownParser: React.FC<DyadMarkdownParserProps> = ({
   content,
@@ -423,6 +425,7 @@ function renderCustomTag(
         <DyadWebFetch
           node={{
             properties: {
+              url: attributes.url || "",
               state: getState({ isStreaming, inProgress }),
             },
           }}
@@ -812,6 +815,20 @@ function renderCustomTag(
         >
           {content}
         </DyadReadGuide>
+      );
+
+    case "dyad-skill":
+      return (
+        <DyadSkill
+          node={{
+            properties: {
+              name: attributes.name || "",
+              state: getState({ isStreaming, inProgress }),
+            },
+          }}
+        >
+          {content}
+        </DyadSkill>
       );
 
     case "dyad-image-generation":

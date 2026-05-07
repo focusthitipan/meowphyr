@@ -1,4 +1,4 @@
-import { OpenAICompatibleChatLanguageModel } from "@ai-sdk/openai-compatible";
+﻿import { OpenAICompatibleChatLanguageModel } from "@ai-sdk/openai-compatible";
 import { OpenAIResponsesLanguageModel } from "@ai-sdk/openai/internal";
 import {
   FetchFunction,
@@ -190,7 +190,7 @@ export function createDyadEngine(
           headers: {
             ...outgoingHeaders,
             ...(modifiedRequestId && {
-              "X-Dyad-Request-Id": modifiedRequestId,
+              "X-Meowphyr-Request-Id": modifiedRequestId,
             }),
           },
           body: JSON.stringify(parsedBody),
@@ -249,7 +249,7 @@ export async function transcribeWithDyadEngine(
   const apiKey = loadApiKey({
     apiKey: options.apiKey,
     environmentVariableName: "DYAD_PRO_API_KEY",
-    description: "Dyad Pro API key",
+    description: "Meowphyr Pro API key",
   });
   logger.info("transcribing with dyad engine with baseURL", baseURL);
 
@@ -272,7 +272,7 @@ export async function transcribeWithDyadEngine(
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
-      "X-Dyad-Request-Id": requestId,
+      "X-Meowphyr-Request-Id": requestId,
       ...options.headers,
     },
     body: formData,
@@ -281,7 +281,7 @@ export async function transcribeWithDyadEngine(
   if (!response.ok) {
     const errorText = await response.text();
     throw new DyadError(
-      `Dyad Engine transcription failed: ${response.status} ${response.statusText} - ${errorText}`,
+      `Meowphyr Engine transcription failed: ${response.status} ${response.statusText} - ${errorText}`,
       DyadErrorKind.External,
     );
   }

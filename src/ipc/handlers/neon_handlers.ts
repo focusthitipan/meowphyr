@@ -1,4 +1,4 @@
-import fs from "node:fs/promises";
+﻿import fs from "node:fs/promises";
 import { createTestOnlyLoggedHandler } from "./safe_handle";
 import { createTypedHandler } from "./base";
 import { handleNeonOAuthReturn } from "../../neon_admin/neon_return_handler";
@@ -434,7 +434,7 @@ export function registerNeonHandlers() {
     }
   });
 
-  // Link an existing Neon project to a Dyad app
+  // Link an existing Neon project to a Meowphyr app
   createTypedHandler(neonContracts.setAppProject, async (_, params) => {
     const { appId, projectId } = params;
     logger.info(`Setting Neon project ${projectId} for app ${appId}`);
@@ -562,7 +562,7 @@ export function registerNeonHandlers() {
     }
   });
 
-  // Unlink a Neon project from a Dyad app
+  // Unlink a Neon project from a Meowphyr app
   createTypedHandler(neonContracts.unsetAppProject, async (_, params) => {
     const { appId } = params;
     logger.info(`Unsetting Neon project for app ${appId}`);

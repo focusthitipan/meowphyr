@@ -7,7 +7,6 @@ import posthog from "posthog-js";
 import {
   getTelemetryUserId,
   isTelemetryOptedIn,
-  isDyadProUser,
 } from "./hooks/useSettings";
 
 // Initialize i18next before any rendering
@@ -96,19 +95,7 @@ const posthogClient = posthog.init(
         event.properties["$ip"] = null;
       }
 
-      // For non-Pro users, only send 10% of events (but always send errors)
-      if (!isDyadProUser()) {
-        const isErrorEvent =
-          event?.event === "$exception" ||
-          event?.event?.toLowerCase().includes("error") ||
-          event?.properties?.$exception_type ||
-          event?.properties?.error;
 
-        if (!isErrorEvent && Math.random() > 0.1) {
-          console.debug("Non-Pro user: sampling out event", event?.event);
-          return null;
-        }
-      }
 
       console.debug(
         "Telemetry opted in - UUID:",
@@ -127,14 +114,6 @@ posthogClient.opt_out_capturing();
 
 function App() {
   const queryClient = useQueryClient();
-
-  // Fetch user budget on app load
-  useEffect(() => {
-    queryClient.prefetchQuery({
-      queryKey: queryKeys.userBudget.info,
-      queryFn: () => ipc.system.getUserBudget(),
-    });
-  }, [queryClient]);
 
   useEffect(() => {
     // Subscribe to navigation state changes

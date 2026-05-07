@@ -1,4 +1,4 @@
-export const SECTION_IDS = {
+﻿export const SECTION_IDS = {
   general: "general-settings",
   workflow: "workflow-settings",
   ai: "ai-settings",
@@ -106,7 +106,7 @@ export const SETTINGS_SEARCH_INDEX: SearchableSettingItem[] = [
     id: SETTING_IDS.customAppsFolder,
     label: "Customize Apps Folder",
     description:
-      "Set the top-level folder that Dyad will store new applications in",
+      "Set the top-level folder that Meowphyr will store new applications in",
     keywords: ["customize", "apps", "path", "folder", "directory", "dyad-apps"],
     sectionId: SECTION_IDS.general,
     sectionLabel: "General",

@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Loader2, Upload, X, Sparkles, Lock, Link } from "lucide-react";
+import { Loader2, Upload, X, Sparkles, Link } from "lucide-react";
 import {
   useGenerateThemePrompt,
   useGenerateThemeFromUrl,
@@ -13,8 +13,6 @@ import { ipc } from "@/ipc/types";
 import { showError } from "@/lib/toast";
 import { toast } from "sonner";
 import { useSettings } from "@/hooks/useSettings";
-import { AiAccessBanner } from "./ProBanner";
-import { isDyadProEnabled } from "@/lib/schemas";
 import type {
   ThemeGenerationMode,
   ThemeGenerationModel,
@@ -70,12 +68,14 @@ export function AIGeneratorTab({
   const [inputSource, setInputSource] = useState<ThemeInputSource>("images");
   const [websiteUrl, setWebsiteUrl] = useState("");
 
-  const generatePromptMutation = useGenerateThemePrompt();
-  const generateFromUrlMutation = useGenerateThemeFromUrl();
+  const generatePromptStream = useGenerateThemePrompt();
+  const generateFromUrlStream = useGenerateThemeFromUrl();
   const isGenerating =
-    generatePromptMutation.isPending || generateFromUrlMutation.isPending;
+    generatePromptStream.isPending || generateFromUrlStream.isPending;
+  const streamingText =
+    generatePromptStream.streamingText || generateFromUrlStream.streamingText;
+  const statusMessage = generateFromUrlStream.statusMessage;
   const { settings } = useSettings();
-  const isProEnabled = settings ? isDyadProEnabled(settings) : false;
   const { themeGenerationModelOptions, isLoadingThemeGenerationModelOptions } =
     useThemeGenerationModelOptions();
 
@@ -107,22 +107,23 @@ export function AIGeneratorTab({
     isDialogOpenRef.current = isDialogOpen;
   }, [isDialogOpen]);
 
-  // Derived: unique providers from model options
+  // Derived: unique providers from model options (filtered by vision when using images)
   const providers = themeGenerationModelOptions.reduce(
     (acc, option) => {
-      const providerId = option.id.split("::")[0] ?? "";
-      const providerName = option.label.split(" / ")[0] ?? "";
-      if (providerId && !acc.some((p) => p.id === providerId)) {
-        acc.push({ id: providerId, name: providerName });
+      if (inputSource === "images" && !option.supportsVision) return acc;
+      if (option.providerId && !acc.some((p) => p.id === option.providerId)) {
+        acc.push({ id: option.providerId, name: option.providerName });
       }
       return acc;
     },
     [] as { id: string; name: string }[],
   );
 
-  // Derived: models filtered by selected provider
+  // Derived: models filtered by selected provider (and vision capability when using images)
   const modelsForSelectedProvider = themeGenerationModelOptions.filter(
-    (option) => option.id.startsWith(`${aiSelectedProvider}::`) || (providers.length === 1 && !aiSelectedProvider),
+    (option) =>
+      (option.providerId === aiSelectedProvider || (providers.length === 1 && !aiSelectedProvider)) &&
+      (inputSource !== "images" || option.supportsVision),
   );
 
   useEffect(() => {
@@ -284,50 +285,63 @@ export function AIGeneratorTab({
     [aiImages, cleanupImages],
   );
 
-  const handleGenerate = useCallback(async () => {
+  const handleGenerate = useCallback(() => {
     if (inputSource === "images") {
-      // Image-based generation
       if (aiImages.length === 0) {
         showError("Please upload at least one image");
         return;
       }
 
-      try {
-        const result = await generatePromptMutation.mutateAsync({
+      const selectedModelOption = themeGenerationModelOptions.find(
+        (o) => o.id === aiSelectedModel,
+      );
+      if (selectedModelOption && !selectedModelOption.supportsVision) {
+        showError(
+          `The selected model "${selectedModelOption.label}" does not support image input. Please select a model with Vision enabled.`,
+        );
+        return;
+      }
+
+      generatePromptStream.start(
+        {
           imagePaths: aiImages.map((img) => img.path),
           keywords: aiKeywords,
           generationMode: aiGenerationMode,
           model: aiSelectedModel,
-        });
-        setAiGeneratedPrompt(result.prompt);
-        toast.success("Theme prompt generated successfully");
-      } catch (error) {
-        showError(
-          `Failed to generate theme: ${error instanceof Error ? error.message : "Unknown error"}`,
-        );
-      }
+        },
+        {
+          onEnd: (fullText) => {
+            setAiGeneratedPrompt(fullText);
+            toast.success("Theme prompt generated successfully");
+          },
+          onError: (error) => {
+            showError(`Failed to generate theme: ${error}`);
+          },
+        },
+      );
     } else {
-      // URL-based generation
       if (!websiteUrl.trim()) {
         showError("Please enter a website URL");
         return;
       }
 
-      try {
-        const result = await generateFromUrlMutation.mutateAsync({
+      generateFromUrlStream.start(
+        {
           url: websiteUrl,
           keywords: aiKeywords,
           generationMode: aiGenerationMode,
           model: aiSelectedModel,
-        });
-
-        setAiGeneratedPrompt(result.prompt);
-        toast.success("Theme prompt generated from website");
-      } catch (error) {
-        showError(
-          `Failed to generate theme: ${error instanceof Error ? error.message : "Unknown error"}`,
-        );
-      }
+        },
+        {
+          onEnd: (fullText) => {
+            setAiGeneratedPrompt(fullText);
+            toast.success("Theme prompt generated from website");
+          },
+          onError: (error) => {
+            showError(`Failed to generate theme: ${error}`);
+          },
+        },
+      );
     }
   }, [
     inputSource,
@@ -336,32 +350,11 @@ export function AIGeneratorTab({
     aiKeywords,
     aiGenerationMode,
     aiSelectedModel,
-    generatePromptMutation,
-    generateFromUrlMutation,
+    themeGenerationModelOptions,
+    generatePromptStream,
+    generateFromUrlStream,
     setAiGeneratedPrompt,
   ]);
-
-  // Show Pro-only locked state for non-Pro users
-  if (!isProEnabled) {
-    return (
-      <div className="space-y-4 mt-4">
-        <div className="flex flex-col items-center justify-center py-8 px-4 border-2 border-dashed border-muted-foreground/25 rounded-lg bg-muted/10">
-          <Lock className="h-12 w-12 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold text-center mb-2">
-            AI Theme Generator
-          </h3>
-          <p className="text-sm text-muted-foreground text-center max-w-md">
-            Upload screenshots and let AI generate a custom theme prompt
-            tailored to your design style.
-          </p>
-          <p className="text-xs text-muted-foreground/70 mt-2">
-            Pro-only feature
-          </p>
-        </div>
-        <AiAccessBanner />
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-4 mt-4">
@@ -562,6 +555,11 @@ export function AIGeneratorTab({
           <div className="text-center py-3 text-sm text-muted-foreground">
             No models available
           </div>
+        ) : inputSource === "images" && providers.length === 0 ? (
+          <div className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            No models with Vision support found. Edit a custom model and enable
+            the <strong>Vision</strong> option to use image input.
+          </div>
         ) : (
           <>
             {/* Provider Selection */}
@@ -639,9 +637,10 @@ export function AIGeneratorTab({
         {isGenerating ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            {inputSource === "url"
-              ? "Generating from website..."
-              : "Generating prompt..."}
+            {statusMessage ||
+              (inputSource === "url"
+                ? "Generating from website..."
+                : "Generating prompt...")}
           </>
         ) : (
           <>
@@ -654,7 +653,14 @@ export function AIGeneratorTab({
       {/* Generated Prompt Display */}
       <div className="space-y-2">
         <Label htmlFor="ai-prompt">Generated Prompt</Label>
-        {aiGeneratedPrompt ? (
+        {isGenerating && streamingText ? (
+          <Textarea
+            id="ai-prompt"
+            className="min-h-[200px] font-mono text-sm"
+            value={streamingText}
+            readOnly
+          />
+        ) : aiGeneratedPrompt ? (
           <Textarea
             id="ai-prompt"
             className="min-h-[200px] font-mono text-sm"

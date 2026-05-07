@@ -8,6 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 import log from "electron-log";
 import { AgentTodoSchema } from "@/ipc/types";
+import { DYAD_INTERNAL_DIR_NAME } from "@/ipc/utils/media_path_utils";
 import type { Todo } from "./tools/types";
 
 const logger = log.scope("todo_persistence");
@@ -18,7 +19,7 @@ const logger = log.scope("todo_persistence");
  * Layout: `<appPath>/.dyad/todos/<chatId>.json`
  */
 export function getTodosFilePath(appPath: string, chatId: number): string {
-  return path.join(appPath, ".dyad", "todos", `${chatId}.json`);
+  return path.join(appPath, DYAD_INTERNAL_DIR_NAME, "todos", `${chatId}.json`);
 }
 
 /**

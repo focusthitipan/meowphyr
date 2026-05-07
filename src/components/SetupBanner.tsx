@@ -1,4 +1,4 @@
-import { useTranslation } from "react-i18next";
+﻿import { useTranslation } from "react-i18next";
 import { useNavigate } from "@tanstack/react-router";
 import {
   ChevronRight,
@@ -29,7 +29,7 @@ import { usePostHog } from "posthog-js/react";
 import { useLanguageModelProviders } from "@/hooks/useLanguageModelProviders";
 import { useScrollAndNavigateTo } from "@/hooks/useScrollAndNavigateTo";
 // @ts-ignore
-import logo from "../../assets/logo.svg";
+import logo from "../../assets/logo.png";
 // @ts-ignore
 import googleIcon from "../../assets/ai-logos/google-g-icon.svg";
 // @ts-ignore
@@ -443,7 +443,7 @@ function NodeInstallButton({
     case "finished-checking":
       return (
         <div className="mt-3 text-sm text-red-600 dark:text-red-400">
-          Node.js not detected. Closing and re-opening Dyad usually fixes this.
+          Node.js not detected. Closing and re-opening Meowphyr usually fixes this.
         </div>
       );
     default:

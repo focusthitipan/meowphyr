@@ -40,7 +40,11 @@ export { systemContracts, systemEvents } from "./system";
 export { versionContracts } from "./version";
 export { languageModelContracts } from "./language-model";
 export { promptContracts } from "./prompts";
-export { templateContracts } from "./templates";
+export {
+  templateContracts,
+  themeGenerateStreamContract,
+  themeUrlGenerateStreamContract,
+} from "./templates";
 export { proposalContracts } from "./proposals";
 export { importContracts } from "./import";
 export { helpContracts, helpStreamContract } from "./help";
@@ -54,6 +58,8 @@ export { freeAgentQuotaContracts } from "./free_agent_quota";
 export { audioContracts } from "./audio";
 export { mediaContracts } from "./media";
 export { imageGenerationContracts } from "./image_generation";
+export { skillContracts } from "./skills";
+export { codeIndexContracts, codeIndexClient, codeIndexEventClient } from "./code_index";
 
 // =============================================================================
 // Client Exports
@@ -73,7 +79,11 @@ export { systemClient, systemEventClient } from "./system";
 export { versionClient } from "./version";
 export { languageModelClient } from "./language-model";
 export { promptClient } from "./prompts";
-export { templateClient } from "./templates";
+export {
+  templateClient,
+  themeGenerateStreamClient,
+  themeUrlGenerateStreamClient,
+} from "./templates";
 export { proposalClient } from "./proposals";
 export { importClient } from "./import";
 export { helpClient, helpStreamClient } from "./help";
@@ -87,6 +97,8 @@ export { freeAgentQuotaClient } from "./free_agent_quota";
 export { audioClient } from "./audio";
 export { mediaClient } from "./media";
 export { imageGenerationClient } from "./image_generation";
+export { skillClient } from "./skills";
+export type { SkillDto } from "./skills";
 
 // =============================================================================
 // Type Exports
@@ -219,7 +231,6 @@ export type {
   SystemDebugInfo,
   SelectNodeFolderResult,
   DoesReleaseNoteExistParams,
-  UserBudgetInfo,
   TelemetryEventPayload,
 } from "./system";
 
@@ -350,8 +361,6 @@ export {
   AgentToolConsentRequestSchema,
 } from "./agent";
 
-export { UserBudgetInfoSchema } from "./system";
-
 // =============================================================================
 // Aggregated IPC Client
 // =============================================================================
@@ -370,7 +379,11 @@ import { systemClient, systemEventClient } from "./system";
 import { versionClient } from "./version";
 import { languageModelClient } from "./language-model";
 import { promptClient } from "./prompts";
-import { templateClient } from "./templates";
+import {
+  templateClient,
+  themeGenerateStreamClient,
+  themeUrlGenerateStreamClient,
+} from "./templates";
 import { proposalClient } from "./proposals";
 import { importClient } from "./import";
 import { helpClient, helpStreamClient } from "./help";
@@ -384,6 +397,7 @@ import { freeAgentQuotaClient } from "./free_agent_quota";
 import { audioClient } from "./audio";
 import { mediaClient } from "./media";
 import { imageGenerationClient } from "./image_generation";
+import { skillClient as _skillClient } from "./skills";
 
 /**
  * Unified IPC client with all domains organized by namespace.
@@ -414,6 +428,8 @@ export const ipc = {
   // Streaming clients
   chatStream: chatStreamClient,
   helpStream: helpStreamClient,
+  themeGenerateStream: themeGenerateStreamClient,
+  themeUrlGenerateStream: themeUrlGenerateStreamClient,
 
   // Integrations
   github: githubClient,
@@ -443,6 +459,7 @@ export const ipc = {
   audio: audioClient,
   media: mediaClient,
   imageGeneration: imageGenerationClient,
+  skill: _skillClient,
 
   // Event clients for main->renderer pub/sub
   events: {

@@ -23,18 +23,19 @@ import { addIntegrationTool } from "./tools/add_integration";
 import { enableNitroTool } from "./tools/enable_nitro";
 import { readLogsTool } from "./tools/read_logs";
 import { searchReplaceTool } from "./tools/search_replace";
+import { generateImageTool } from "./tools/generate_image";
+import { codeSearchTool } from "./tools/code_search";
 import { webSearchTool } from "./tools/web_search";
 import { webCrawlTool } from "./tools/web_crawl";
 import { webFetchTool } from "./tools/web_fetch";
-import { generateImageTool } from "./tools/generate_image";
 import { updateTodosTool } from "./tools/update_todos";
 import { runTypeChecksTool } from "./tools/run_type_checks";
 import { grepTool } from "./tools/grep";
-import { codeSearchTool } from "./tools/code_search";
 import { planningQuestionnaireTool } from "./tools/planning_questionnaire";
 import { writePlanTool } from "./tools/write_plan";
 import { exitPlanTool } from "./tools/exit_plan";
 import { readGuideTool } from "./tools/read_guide";
+import { useSkillTool } from "./tools/use_skill";
 import type { LanguageModelV3ToolResultOutput } from "@ai-sdk/provider";
 import {
   escapeXmlAttr,
@@ -79,7 +80,6 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   readFileTool,
   listFilesTool,
   grepTool,
-  codeSearchTool,
   getSupabaseProjectInfoTool,
   getNeonProjectInfoTool,
   getDatabaseTableSchemaTool,
@@ -87,13 +87,15 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   addIntegrationTool,
   enableNitroTool,
   readLogsTool,
+  generateImageTool,
+  codeSearchTool,
   webSearchTool,
   webCrawlTool,
   webFetchTool,
-  generateImageTool,
   updateTodosTool,
   runTypeChecksTool,
   readGuideTool,
+  useSkillTool,
   // Plan mode tools
   planningQuestionnaireTool,
   writePlanTool,

@@ -244,8 +244,7 @@ export function ChatList({ show }: { show?: boolean }) {
                         </div>
                       </Button>
 
-                      {selectedChatId === chat.id && (
-                        <DropdownMenu
+                      <DropdownMenu
                           modal={false}
                           onOpenChange={(open) => setIsDropdownOpen(open)}
                         >
@@ -253,7 +252,8 @@ export function ChatList({ show }: { show?: boolean }) {
                             className={buttonVariants({
                               variant: "ghost",
                               size: "icon",
-                              className: "ml-1",
+                              className:
+                                "ml-1 opacity-0 group-hover/menu-item:opacity-100 [&[aria-expanded=true]]:opacity-100",
                             })}
                             onClick={(e) => e.stopPropagation()}
                           >
@@ -286,7 +286,6 @@ export function ChatList({ show }: { show?: boolean }) {
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
-                      )}
                     </div>
                   </SidebarMenuItem>
                 ))}

@@ -193,6 +193,7 @@ export const language_models = sqliteTable("language_models", {
   description: text("description"),
   max_output_tokens: integer("max_output_tokens"),
   context_window: integer("context_window"),
+  supports_vision: integer("supports_vision", { mode: "boolean" }).default(false),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),

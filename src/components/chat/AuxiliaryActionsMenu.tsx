@@ -10,6 +10,7 @@ import {
   PlusCircle,
   MoreHorizontal,
   ImageIcon,
+  X,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -67,6 +68,7 @@ export function AuxiliaryActionsMenu({
   const { settings, updateSettings } = useSettings();
   const queryClient = useQueryClient();
 
+
   // Determine current theme: use app theme if appId exists, otherwise use settings
   // Note: settings stores empty string for "no theme", convert to null
   const currentThemeId =
@@ -97,6 +99,16 @@ export function AuxiliaryActionsMenu({
   }, [customThemes, currentThemeId]);
 
   const hasMoreCustomThemes = customThemes.length > visibleCustomThemes.length;
+
+  // Resolve display name for the current theme
+  const currentThemeName = useMemo(() => {
+    if (!currentThemeId) return null;
+    if (currentThemeId.startsWith("custom:")) {
+      const numericId = parseInt(currentThemeId.replace("custom:", ""), 10);
+      return customThemes.find((t) => t.id === numericId)?.name ?? "Custom";
+    }
+    return themes?.find((t) => t.id === currentThemeId)?.name ?? null;
+  }, [currentThemeId, themes, customThemes]);
 
   const handleThemeSelect = async (themeId: string | null) => {
     if (appId != null) {
@@ -133,6 +145,30 @@ export function AuxiliaryActionsMenu({
 
   return (
     <>
+      <div className="flex items-center gap-1">
+        {currentThemeName && (
+          <button
+            type="button"
+            onClick={() => setIsOpen(true)}
+            className="flex items-center gap-1 px-2 py-1 mb-1 text-xs font-medium rounded-lg bg-primary/10 text-primary hover:bg-primary/15 transition-colors cursor-pointer max-w-[160px]"
+            data-testid="current-theme-chip"
+            title={`Active theme: ${currentThemeName}`}
+          >
+            <Palette size={12} className="shrink-0" />
+            <span className="truncate">{currentThemeName}</span>
+            <span
+              role="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                void handleThemeSelect(null);
+              }}
+              className="hover:bg-primary/20 rounded-sm p-0.5 transition-colors shrink-0"
+              aria-label="Clear theme"
+            >
+              <X size={10} />
+            </span>
+          </button>
+        )}
       <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
         <DropdownMenuTrigger
           className="inline-flex items-center justify-center whitespace-nowrap rounded-full text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover:bg-primary/20 hover:scale-105 bg-primary/10 text-primary cursor-pointer h-8 w-8 mb-1"
@@ -368,6 +404,7 @@ export function AuxiliaryActionsMenu({
           </div>
         </DialogContent>
       </Dialog>
+      </div>
     </>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import { ChevronRight, Loader2, CircleX, CheckCircle2 } from "lucide-react";
 import { CustomTagState } from "./stateTypes";
 
@@ -87,7 +87,7 @@ interface DyadCardProps {
 }
 
 /**
- * Premium container for all Dyad markdown action cards.
+ * Premium container for all Meowphyr markdown action cards.
  * Provides consistent borders, backgrounds, hover states, and a colored
  * left-accent border when the action is pending or aborted (or when
  * `showAccent` is explicitly set).

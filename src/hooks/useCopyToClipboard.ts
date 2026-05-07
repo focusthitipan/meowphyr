@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+﻿import { useState, useRef, useEffect } from "react";
 import { getLanguage } from "@/utils/get_language";
 
 const CUSTOM_TAG_NAMES = [
@@ -50,7 +50,7 @@ export const useCopyToClipboard = () => {
     }
   };
 
-  // Convert Dyad content to clean markdown using the same parsing logic as DyadMarkdownParser
+  // Convert Meowphyr content to clean markdown using the same parsing logic as DyadMarkdownParser
   const convertDyadContentToMarkdown = (content: string): string => {
     if (!content) return "";
 

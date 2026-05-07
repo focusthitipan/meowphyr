@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { showError, showSuccess } from "@/lib/toast";
@@ -45,9 +45,9 @@ export function CustomAppsFolderSelector() {
       await ipc.system.setCustomAppsFolder(null);
       // Update UI to show default directory
       await fetchCustomAppsFolder();
-      showSuccess("Dyad apps folder reset successfully");
+      showSuccess("Meowphyr apps folder reset successfully");
     } catch (error: any) {
-      showError(`Failed to reset Dyad Apps folder path: ${error.message}`);
+      showError(`Failed to reset Meowphyr Apps folder path: ${error.message}`);
     }
   };
 
@@ -59,7 +59,7 @@ export function CustomAppsFolderSelector() {
       setIsPathAvailable(isPathAvailable);
       setIsPathDefault(isPathDefault);
     } catch (error: any) {
-      showError(`Failed to fetch Dyad apps folder path: ${error.message}`);
+      showError(`Failed to fetch Meowphyr apps folder path: ${error.message}`);
     }
   };
 
@@ -114,7 +114,7 @@ export function CustomAppsFolderSelector() {
         <div className="text-sm text-gray-500 dark:text-gray-400">
           <p>
             {isPathAvailable
-              ? "This is the top-level folder that Dyad will store new applications in."
+              ? "This is the top-level folder that Meowphyr will store new applications in."
               : "Your apps folder is inaccessible. Make sure that the folder exists and has write permissions, or change it."}
           </p>
         </div>

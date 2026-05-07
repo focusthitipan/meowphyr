@@ -1,4 +1,4 @@
-import { dialog } from "electron";
+﻿import { dialog } from "electron";
 import fs from "fs/promises";
 import path from "path";
 import { createLoggedHandler } from "./safe_handle";
@@ -116,7 +116,7 @@ export function registerImportHandlers() {
             throw error;
           }
         }
-        // Copy the app folder to the Dyad apps directory.
+        // Copy the app folder to the Meowphyr apps directory.
         // Why not use fs.cp? Because we want stable ordering for
         // tests.
         await copyDirectoryRecursive(sourcePath, appPath);
@@ -137,7 +137,7 @@ export function registerImportHandlers() {
         // Create initial commit
         await gitCommit({
           path: appPath,
-          message: "Init Dyad app",
+          message: "Init Meowphyr app",
         });
       }
 

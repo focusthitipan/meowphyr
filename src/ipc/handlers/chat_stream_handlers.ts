@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from "uuid";
+﻿import { v4 as uuidv4 } from "uuid";
 import { ipcMain, IpcMainInvokeEvent } from "electron";
 import { createTypedHandler } from "./base";
 import { chatContracts } from "../types/chat";
@@ -98,16 +98,16 @@ import {
 import { prompts as promptsTable } from "../../db/schema";
 import { inArray } from "drizzle-orm";
 import { replacePromptReference } from "../utils/replacePromptReference";
-import { replaceSlashSkillReference } from "../utils/replaceSlashSkillReference";
+import { replaceSlashSkillReference, replaceSlashSkillBadge } from "../utils/replaceSlashSkillReference";
+import { getAllSkillsBySlug, getAllSkillsForPrompt, type SkillMeta } from "./skill_handlers";
 import { resolveMediaMentions } from "../utils/resolve_media_mentions";
 import { parsePlanFile, validatePlanId } from "./planUtils";
 import { ensureDyadGitignored } from "./gitignoreUtils";
-import { DYAD_MEDIA_DIR_NAME } from "../utils/media_path_utils";
+import { DYAD_MEDIA_DIR_NAME, DYAD_INTERNAL_DIR_NAME } from "../utils/media_path_utils";
 import { mcpManager } from "../utils/mcp_manager";
 import z from "zod";
 import {
   isBasicAgentMode,
-  isDyadProEnabled,
   isLocalAgentBackedMode,
   isSupabaseConnected,
   isTurboEditsV2Enabled,
@@ -130,6 +130,25 @@ import { readSettings } from "@/main/settings";
 type AsyncIterableStream<T> = AsyncIterable<T> & ReadableStream<T>;
 
 const logger = log.scope("chat_stream_handlers");
+
+function buildSkillsSystemPromptSection(skills: SkillMeta[]): string {
+  if (skills.length === 0) return "";
+  const lines = [
+    "# Available Skills",
+    "",
+    "The following skills provide specialized instructions for specific tasks.",
+    "When the user's request matches a skill's description, or the user invokes a skill with /slug, call the `use_skill` tool to load the full instructions before responding.",
+    "",
+  ];
+  for (const skill of skills) {
+    const invocation = skill.argumentHint
+      ? `/${skill.slug} ${skill.argumentHint}`
+      : `/${skill.slug}`;
+    const description = skill.description ?? skill.title;
+    lines.push(`- **${skill.title}** (\`${invocation}\`): ${description}`);
+  }
+  return lines.join("\n");
+}
 
 // Track active streams for cancellation
 const activeStreams = new Map<number, AbortController>();
@@ -401,18 +420,19 @@ export function registerChatStreamHandlers() {
         logger.error("Failed to inline referenced prompts:", e);
       }
 
-      // Expand /slug skill references (e.g. /webapp-testing) to prompt content
+      // Expand /slug skill references (DB prompts + global file skills)
       try {
-        const slashSkillPattern = /(?:^|\s)\/([a-zA-Z0-9-]+)(?=\s|$)/;
-        if (slashSkillPattern.test(userPrompt)) {
-          const allPrompts = db.select().from(promptsTable).all();
-          const promptsBySlug: Record<string, string> = {};
-          for (const p of allPrompts) {
-            if (p.slug && !promptsBySlug[p.slug]) {
-              promptsBySlug[p.slug] = p.content;
-            }
+        if (/(?:^|\s)\/[a-zA-Z0-9-]/.test(userPrompt)) {
+          const skillsBySlug = await getAllSkillsBySlug();
+          const expanded = replaceSlashSkillReference(userPrompt, skillsBySlug);
+          if (expanded !== userPrompt) {
+            // Set displayUserPrompt with badge tags so the UI shows a badge instead of raw content
+            displayUserPrompt = replaceSlashSkillBadge(
+              displayUserPrompt ?? req.prompt,
+              skillsBySlug,
+            );
           }
-          userPrompt = replaceSlashSkillReference(userPrompt, promptsBySlug);
+          userPrompt = expanded;
         }
       } catch (e) {
         logger.error("Failed to expand slash skill references:", e);
@@ -469,14 +489,14 @@ export function registerChatStreamHandlers() {
           const appPath = getDyadAppPath(chat.app.path);
           const planFilePath = path.join(
             appPath,
-            ".dyad",
+            DYAD_INTERNAL_DIR_NAME,
             "plans",
             `${planSlug}.md`,
           );
           const raw = await fs.promises.readFile(planFilePath, "utf-8");
           const { meta, content } = parsePlanFile(raw);
 
-          const planPath = `.dyad/plans/${planSlug}.md`;
+          const planPath = `${DYAD_INTERNAL_DIR_NAME}/plans/${planSlug}.md`;
 
           userPrompt = `Please implement the following plan:
 
@@ -563,11 +583,8 @@ ${componentSnippet}
         effectiveChatMode: selectedChatMode,
         chatModeFallbackReason,
       });
-      // Only Dyad Pro requests have request ids.
-      if (isDyadProEnabled(settings)) {
-        // Generate requestId early so it can be saved with the message
-        dyadRequestId = uuidv4();
-      }
+      // Generate requestId early so it can be saved with the message
+      dyadRequestId = uuidv4();
 
       // Add a placeholder assistant message immediately
       const [placeholderAssistantMessage] = await db
@@ -764,7 +781,7 @@ ${componentSnippet}
           }
         }
 
-        // For Dyad Pro + Deep Context, we set to 200 chat turns (+1)
+        // For Meowphyr Pro + Deep Context, we set to 200 chat turns (+1)
         // this is to enable more cache hits. Practically, users should
         // rarely go over this limit because they will hit the model's
         // context window limit.
@@ -830,6 +847,18 @@ ${componentSnippet}
           frameworkType,
           hasSupabaseProject: !!updatedChat.app?.supabaseProjectId,
         });
+
+        // Inject available skills into the system prompt so the AI knows
+        // what skills exist and can suggest them when relevant.
+        try {
+          const skillsForPrompt = await getAllSkillsForPrompt();
+          const skillsSection = buildSkillsSystemPromptSection(skillsForPrompt);
+          if (skillsSection) {
+            systemPrompt += "\n\n" + skillsSection;
+          }
+        } catch (e) {
+          logger.error("Failed to inject skills into system prompt:", e);
+        }
 
         // Add information about mentioned apps for build mode only.
         // Full codebase injection (build mode): full file contents already
@@ -940,7 +969,7 @@ When files are attached for upload to the codebase, use the \`copy_file\` tool t
 
 Example:
 \`\`\`
-copy_file(from=".dyad/media/abc123.png", to="src/assets/logo.png", description="Copy uploaded image into project")
+copy_file(from=".meowphyr/media/abc123.png", to="src/assets/logo.png", description="Copy uploaded image into project")
 \`\`\`
 
 The file paths are provided in the attachment information above.
@@ -950,7 +979,7 @@ The file paths are provided in the attachment information above.
 
 When files are attached for upload to the codebase, copy them into the project using this format:
 
-<dyad-copy from=".dyad/media/abc123.png" to="src/assets/logo.png" description="Copy uploaded file"></dyad-copy>
+<dyad-copy from=".meowphyr/media/abc123.png" to="src/assets/logo.png" description="Copy uploaded file"></dyad-copy>
 
 The file paths are provided in the attachment information above.
 `;

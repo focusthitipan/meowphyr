@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Shared types and utilities for Local Agent tools
  */
 
@@ -60,13 +60,13 @@ export interface AgentContext {
   chatSummary?: string;
   /** Turn-scoped todo list for agent task tracking */
   todos: Todo[];
-  /** Request ID for tracking requests to the Dyad engine */
+  /** Request ID for tracking requests to the Meowphyr engine */
   dyadRequestId: string;
   /** Tracks file edit tool usage per file for telemetry */
   fileEditTracker: FileEditTracker;
   /**
-   * If true, the user has Dyad Pro enabled.
-   * Engine-dependent tools require this to access the Dyad Pro API.
+   * If true, the user has Meowphyr Pro enabled.
+   * Engine-dependent tools require this to access the Meowphyr Pro API.
    */
   isDyadPro: boolean;
   /**

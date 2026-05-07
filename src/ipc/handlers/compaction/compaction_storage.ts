@@ -8,6 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 import log from "electron-log";
 import { ensureDyadGitignored } from "@/ipc/handlers/gitignoreUtils";
+import { DYAD_INTERNAL_DIR_NAME } from "@/ipc/utils/media_path_utils";
 
 const logger = log.scope("compaction_storage");
 
@@ -28,7 +29,7 @@ export interface CompactionMessage {
  * Get the backup directory for a specific chat within the app's .dyad/chats/ directory.
  */
 function getChatBackupDir(appPath: string, chatId: number): string {
-  return path.join(appPath, ".dyad", "chats", String(chatId));
+  return path.join(appPath, DYAD_INTERNAL_DIR_NAME, "chats", String(chatId));
 }
 
 /**

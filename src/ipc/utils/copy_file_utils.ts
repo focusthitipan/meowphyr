@@ -1,4 +1,4 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
 import log from "electron-log";
 import { safeJoin } from "./path_utils";
@@ -23,7 +23,7 @@ export interface CopyFileResult {
 }
 
 /**
- * Copy a file within a Dyad app, with security validation, git staging,
+ * Copy a file within a Meowphyr app, with security validation, git staging,
  * and optional Supabase function deployment.
  *
  * @throws Error if an absolute source path is outside the app's .dyad/media directory.

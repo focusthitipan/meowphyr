@@ -36,6 +36,8 @@ import { DefaultChatModeSelector } from "@/components/DefaultChatModeSelector";
 import { ContextCompactionSwitch } from "@/components/ContextCompactionSwitch";
 import { BlockUnsafeNpmPackagesSwitch } from "@/components/BlockUnsafeNpmPackagesSwitch";
 import { ImageGenerationSettings } from "@/components/ImageGenerationSettings";
+import { WebSearchSettings } from "@/components/WebSearchSettings";
+import { EmbeddingSettings } from "@/components/EmbeddingSettings";
 import { CloudSandboxExperimentSwitch } from "@/components/CloudSandboxExperimentSwitch";
 import { useSetAtom } from "jotai";
 import { activeSettingsSectionAtom } from "@/atoms/viewAtoms";
@@ -188,6 +190,12 @@ export default function SettingsPage() {
               </div>
               <div className="space-y-1 mt-4 border-t pt-4">
                 <ImageGenerationSettings />
+              </div>
+              <div className="space-y-1 mt-4 border-t pt-4">
+                <WebSearchSettings />
+              </div>
+              <div className="space-y-1 mt-4 border-t pt-4">
+                <EmbeddingSettings />
               </div>
               <div
                 id={SETTING_IDS.enableMcpServersForBuildMode}

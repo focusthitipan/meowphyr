@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { DYAD_INTERNAL_DIR_NAME } from "@/ipc/utils/media_path_utils";
 import { db } from "../../db";
 import { apps } from "../../db/schema";
 import { eq } from "drizzle-orm";
@@ -23,7 +24,7 @@ async function getPlanDir(appId: number): Promise<string> {
   const app = await db.query.apps.findFirst({ where: eq(apps.id, appId) });
   if (!app) throw new Error("App not found");
   const appPath = getDyadAppPath(app.path);
-  const planDir = path.join(appPath, ".dyad", "plans");
+  const planDir = path.join(appPath, DYAD_INTERNAL_DIR_NAME, "plans");
   await fs.promises.mkdir(planDir, { recursive: true });
   await ensureDyadGitignored(appPath);
   return planDir;

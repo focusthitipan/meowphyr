@@ -1,4 +1,4 @@
-import { LanguageModel } from "@/ipc/types";
+﻿import { LanguageModel } from "@/ipc/types";
 
 export const PROVIDERS_THAT_SUPPORT_THINKING: (keyof typeof MODEL_OPTIONS)[] = [
   "google",
@@ -534,7 +534,7 @@ export const CLOUD_PROVIDERS: Record<
     displayName: "Google Vertex AI",
     hasFreeTier: false,
     websiteUrl: "https://console.cloud.google.com/vertex-ai",
-    // Use the same gateway prefix as Google Gemini for Dyad Pro compatibility.
+    // Use the same gateway prefix as Google Gemini for Meowphyr Pro compatibility.
     gatewayPrefix: "gemini/",
     secondary: true,
   },

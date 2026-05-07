@@ -313,7 +313,7 @@ function deepHello() {
     });
 
     it("searches hidden ignored files when include_ignored is true", async () => {
-      const dyadDir = path.join(testDir, ".dyad");
+      const dyadDir = path.join(testDir, ".meowphyr");
       await fs.promises.mkdir(dyadDir, { recursive: true });
       await fs.promises.writeFile(
         path.join(dyadDir, "backup.txt"),
@@ -324,12 +324,12 @@ function deepHello() {
         {
           query: "hiddenIgnoredNeedle",
           include_ignored: true,
-          include_pattern: ".dyad/**",
+          include_pattern: ".meowphyr/**",
         },
         mockContext,
       );
 
-      expect(result).toContain(".dyad/backup.txt");
+      expect(result).toContain(".meowphyr/backup.txt");
     });
 
     it("keeps .git excluded when include_ignored is true", async () => {
