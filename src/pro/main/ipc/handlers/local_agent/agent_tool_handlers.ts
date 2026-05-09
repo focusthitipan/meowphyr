@@ -7,6 +7,7 @@ import {
   setAgentToolConsent,
   resolveAgentToolConsent,
   TOOL_DEFINITIONS,
+  SWARM_TOOL_METADATA,
   getDefaultConsent,
   type AgentToolName,
 } from "./tool_definitions";
@@ -24,12 +25,19 @@ export function registerAgentToolHandlers() {
   // Get list of available tools with their consent settings
   handle("agent-tool:get-tools", async (): Promise<AgentTool[]> => {
     const consents = getAllAgentToolConsents();
-    return TOOL_DEFINITIONS.map((tool) => ({
+    const regularTools: AgentTool[] = TOOL_DEFINITIONS.map((tool) => ({
       name: tool.name,
       description: tool.description,
       isAllowedByDefault: getDefaultConsent(tool.name) === "always",
       consent: consents[tool.name],
     }));
+    const swarmTools: AgentTool[] = SWARM_TOOL_METADATA.map((tool) => ({
+      name: tool.name,
+      description: tool.description,
+      isAllowedByDefault: true,
+      consent: consents[tool.name as AgentToolName],
+    }));
+    return [...regularTools, ...swarmTools];
   });
 
   // Set consent for a single tool

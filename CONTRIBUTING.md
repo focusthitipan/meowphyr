@@ -14,7 +14,7 @@ Something that I really appreciate are all the non-code contributions, such as r
 
 ## Development
 
-Dyad is an Electron app.
+Meowphyr is an Electron app.
 
 **Install dependencies:**
 

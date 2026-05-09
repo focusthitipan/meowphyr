@@ -58,6 +58,13 @@ log.scope.labelPadding = false;
 
 const logger = log.scope("main");
 
+// Set app name and Windows App User Model ID so notifications show the correct
+// app name/icon instead of "electron.app.Electron".
+app.name = "Meowphyr";
+if (process.platform === "win32") {
+  app.setAppUserModelId("Meowphyr");
+}
+
 // Load environment variables from .env file
 dotenv.config();
 

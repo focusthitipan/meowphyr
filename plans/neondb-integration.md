@@ -8,7 +8,7 @@ Elevate Neon from a Portal-template-only experiment to a first-class database in
 
 ## Problem Statement
 
-Today, Neon in Dyad is a second-class citizen:
+Today, Neon in Meowphyr is a second-class citizen:
 
 - **Locked to the Portal template**: Only `portal-mini-store` has `requiresNeon: true` — users cannot use Neon with Next.js templates
 - **No agent tools**: The AI agent has no `execute_sql`, `get_table_schema`, or `get_project_info` equivalents for Neon

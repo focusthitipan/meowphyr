@@ -14,6 +14,7 @@ interface DyadListFilesProps {
   node: {
     properties: {
       directory?: string;
+      pattern?: string;
       recursive?: string;
       include_ignored?: string;
       state?: CustomTagState;
@@ -24,7 +25,7 @@ interface DyadListFilesProps {
 }
 
 export function DyadListFiles({ node, children }: DyadListFilesProps) {
-  const { directory, recursive, include_ignored, state, appName } =
+  const { directory, pattern, recursive, include_ignored, state, appName } =
     node.properties;
   const isLoading = state === "pending";
   const isRecursive = recursive === "true";
@@ -32,7 +33,11 @@ export function DyadListFiles({ node, children }: DyadListFilesProps) {
   const content = typeof children === "string" ? children : "";
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const title = directory ? directory : "List Files";
+  const title = pattern
+    ? `glob: ${pattern}`
+    : directory
+      ? directory
+      : "List Files";
 
   return (
     <DyadCard

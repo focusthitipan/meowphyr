@@ -57,7 +57,7 @@ Or use the `/dyad:lint` skill if available.
 
 ## Architecture overview
 
-Dyad is an **Electron app** — a local, open-source AI app builder. It has:
+Meowphyr is an **Electron app** — a local, open-source AI app builder. It has:
 
 - **Main process** (`src/main.ts`, `src/ipc/ipc_host.ts`): Electron backend, IPC handlers, file I/O, AI streaming
 - **Renderer process** (`src/renderer.tsx`): React 19 SPA with TanStack Router + TanStack Query
@@ -91,10 +91,32 @@ Each tool is a `ToolDefinition<T>` with:
 - `execute(args, ctx): Promise<string>` — returns text result to AI
 - `buildXml(args, isComplete): string | undefined` — renders UI indicator in chat
 - `getConsentPreview?(args): string`
+- `isEnabled?(ctx): boolean` — optional; return `false` to filter the tool out for a given context (e.g. framework-specific tools)
 
 All tools are registered in `TOOL_DEFINITIONS` in `tool_definitions.ts`. Add new tools there.
 
 Use `ctx.onXmlComplete(xml)` to surface output in the chat UI. Use `ctx.onWarningMessage(msg)` for toast warnings.
+
+**`AgentContext` key fields** (see `tools/types.ts` for the full interface):
+- `runSubAgent?(prompt, description, options)` — spawns a sub-agent; `options.background` returns immediately and the agent reports back via `send_message`
+- `swarm?: AgentSwarm` — in-session message bus shared across the leader and all sub-agents
+- `agentName?: string` — this agent's registered swarm name (`undefined` for the leader)
+- `referencedApps: Map<string, string>` — apps mentioned via `@app:Name`; read-only tools can target them via `app_name`
+
+### Agent Swarm (`tools/agent_swarm.ts`)
+
+An in-process multi-agent coordination system. One **leader** agent can spawn named **worker** agents that share a single `AgentSwarm` instance (in-memory mailboxes — no file I/O).
+
+Key concepts:
+- **`runSubAgent(prompt, desc, { name, background })`** on `AgentContext` — spawns a worker. Without `background`, blocks until the worker finishes. With `background: true`, returns immediately; the worker uses `send_message_tool` to report back.
+- **`send_message_tool`** / **`read_messages_tool`** / **`wait_for_reply_tool`** — inter-agent messaging tools available to both leader and workers.
+- **`monitor_agents_tool`** — lets the leader poll lifecycle state (`running` / `completed` / `failed`) of all workers.
+- **`sleep_tool`** — used by agents that need to yield while waiting for async events.
+- **Permission bridge** — sub-agent consent requests are routed to the leader's `requireConsent` handler (shown to the user via Electron UI).
+
+### Shell session (`tools/shell_session.ts`, `tools/bash_tool.ts`)
+
+`bash_tool` executes shell commands with a **persistent cwd** across calls within a single agent turn. The cwd is stored in `shell_session.ts` (`getSessionCwd` / `setSessionCwd`) using a per-session temp file, so `cd` in one `bash_tool` call carries over to subsequent calls. On Windows it resolves Git Bash / MSYS2 bash automatically.
 
 ### React Query keys
 
@@ -122,7 +144,7 @@ SKILL.md frontmatter fields: `name` (display title), `description`, `argument-hi
 
 ### Fork-specific changes
 
-This is `focusthitipan/dyad`, a personal fork of `dyad-sh/dyad`. Key customizations:
+This is `focusthitipan/meowphyr`, a personal fork of `dyad-sh/dyad`. Key customizations:
 - Dyad Pro feature checks centralized via `isDyadProEnabled`; Pro bypass re-enabled for local use
 - Default model: `gemini-2.5-flash-preview`
 - Removed cloud-dependent UI (onboarding banner, Pro trial card, `auto` provider)
@@ -134,7 +156,7 @@ This is `focusthitipan/dyad`, a personal fork of `dyad-sh/dyad`. Key customizati
 - **Throw `DyadError`** (not plain `Error`) from IPC handlers for expected non-bug failures (validation, not found, auth, etc.) to suppress PostHog noise.
 - **No `remote` module** — Electron security practice. Validate and lock mutations by `appId`.
 - **Settings writes:** `writeSettings(partial)` does a shallow top-level merge. Always spread the parent object to avoid silently dropping sibling fields. Call `readSettings()` immediately before `writeSettings()` — never across an `await` boundary.
-- **`<dyad-status>` tags** render as collapsible status indicators in chat. Valid states: `finished`, `in-progress`, `aborted`.
+- **`<dyad-status>` tags** render as collapsible status indicators in chat. Valid states: `finished`, `in-progress`, `aborted`, `pending`.
 
 ## Testing
 
@@ -145,6 +167,6 @@ This is `focusthitipan/dyad`, a personal fork of `dyad-sh/dyad`. Key customizati
 
 ## Git workflow
 
-- Push to `origin` (fork `focusthitipan/dyad`) for new branches; create PRs from fork to upstream (`dyad-sh/dyad`).
+- Push to `origin` (fork `focusthitipan/meowphyr`) for new branches; create PRs from fork to upstream (`dyad-sh/dyad`).
 - Add `#skip-bugbot` to PR description for trivial changes (CI config, docs, agent config).
 - Run `npm run init-precommit` once after `npm install` to activate pre-commit hooks.

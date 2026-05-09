@@ -36,6 +36,10 @@ import { writePlanTool } from "./tools/write_plan";
 import { exitPlanTool } from "./tools/exit_plan";
 import { readGuideTool } from "./tools/read_guide";
 import { useSkillTool } from "./tools/use_skill";
+import { bashTool } from "./tools/bash_tool";
+import { globTool } from "./tools/glob_tool";
+import { agentTool } from "./tools/agent_tool";
+import { sleepTool } from "./tools/sleep_tool";
 import type { LanguageModelV3ToolResultOutput } from "@ai-sdk/provider";
 import {
   escapeXmlAttr,
@@ -80,6 +84,10 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   readFileTool,
   listFilesTool,
   grepTool,
+  globTool,
+  bashTool,
+  agentTool,
+  sleepTool,
   getSupabaseProjectInfoTool,
   getNeonProjectInfoTool,
   getDatabaseTableSchemaTool,
@@ -102,10 +110,50 @@ export const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   exitPlanTool,
 ];
 // ============================================================================
-// Agent Tool Name Type (derived from TOOL_DEFINITIONS)
+// Swarm Tool Metadata
+// Tools created via factory functions (need runtime swarm/ctx access) cannot
+// live in TOOL_DEFINITIONS, but their metadata is registered here so they
+// appear in the agent permissions settings UI.
 // ============================================================================
 
-export type AgentToolName = (typeof TOOL_DEFINITIONS)[number]["name"];
+export const SWARM_TOOL_METADATA: ReadonlyArray<{
+  name: string;
+  description: string;
+  defaultConsent: AgentToolConsent;
+}> = [
+  {
+    name: "send_message",
+    description:
+      "Send a message to another agent in the swarm or broadcast to all.",
+    defaultConsent: "always",
+  },
+  {
+    name: "read_messages",
+    description:
+      "Read messages in your inbox sent by other agents. Returns only unread messages by default.",
+    defaultConsent: "always",
+  },
+  {
+    name: "wait_for_reply",
+    description:
+      "Block and wait for an incoming message from another agent. Use after send_message when you need a response before continuing.",
+    defaultConsent: "always",
+  },
+  {
+    name: "monitor_agents",
+    description:
+      "Check the live status of all spawned sub-agents (running / completed / failed) and whether they have unread messages in the inbox.",
+    defaultConsent: "always",
+  },
+] as const;
+
+// ============================================================================
+// Agent Tool Name Type (derived from TOOL_DEFINITIONS + SWARM_TOOL_METADATA)
+// ============================================================================
+
+export type AgentToolName =
+  | (typeof TOOL_DEFINITIONS)[number]["name"]
+  | (typeof SWARM_TOOL_METADATA)[number]["name"];
 
 // ============================================================================
 // Agent Tool Consent Management
@@ -218,7 +266,9 @@ export function clearPendingQuestionnairesForChat(chatId: number): void {
 
 export function getDefaultConsent(toolName: AgentToolName): AgentToolConsent {
   const tool = TOOL_DEFINITIONS.find((t) => t.name === toolName);
-  return tool?.defaultConsent ?? "ask";
+  if (tool) return tool.defaultConsent ?? "ask";
+  const swarmTool = SWARM_TOOL_METADATA.find((t) => t.name === toolName);
+  return swarmTool?.defaultConsent ?? "ask";
 }
 
 export function getAgentToolConsent(toolName: AgentToolName): AgentToolConsent {
@@ -251,14 +301,14 @@ export function getAllAgentToolConsents(): Record<
   const stored = settings.agentToolConsents ?? {};
   const result: Record<string, AgentToolConsent> = {};
 
-  // Start with defaults, override with stored values
+  // Regular tools
   for (const tool of TOOL_DEFINITIONS) {
-    const storedConsent = stored[tool.name];
-    if (storedConsent) {
-      result[tool.name] = storedConsent;
-    } else {
-      result[tool.name] = getDefaultConsent(tool.name as AgentToolName);
-    }
+    result[tool.name] = stored[tool.name] ?? getDefaultConsent(tool.name as AgentToolName);
+  }
+
+  // Swarm tools
+  for (const tool of SWARM_TOOL_METADATA) {
+    result[tool.name] = stored[tool.name] ?? tool.defaultConsent;
   }
 
   return result as Record<AgentToolName, AgentToolConsent>;

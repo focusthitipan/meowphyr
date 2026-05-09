@@ -444,7 +444,12 @@ export function LexicalChatInput({
     (editorState: EditorState) => {
       editorState.read(() => {
         const root = $getRoot();
-        let textContent = root.getTextContent();
+        // getTextContent() concatenates paragraph nodes without separators,
+        // so multi-paragraph input loses line breaks. Join children with \n instead.
+        let textContent = root
+          .getChildren()
+          .map((child) => child.getTextContent())
+          .join("\n");
 
         // If the history trigger is active, keep the input value empty while the
         // menu is open, and always strip the invisible trigger from the value.

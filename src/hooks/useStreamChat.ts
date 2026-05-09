@@ -203,6 +203,13 @@ export function useStreamChat({
                 queryKeys.chats.detail({ chatId }),
               );
 
+        // Track chunks received after onEnd to detect if background sub-agents
+        // are still streaming. If so, skip overwriting messages with the stale
+        // getChat() result from onEnd (the onChunk handler already has the
+        // latest state).
+        let postEndChunkCount = 0;
+        let isPostEnd = false;
+
         ipc.chatStream.start(
           {
             chatId,
@@ -223,6 +230,7 @@ export function useStreamChat({
               effectiveChatMode,
               chatModeFallbackReason,
             }) => {
+              if (isPostEnd) postEndChunkCount++;
               if (
                 handleEffectiveChatModeChunk(
                   { effectiveChatMode, chatModeFallbackReason },
@@ -276,6 +284,7 @@ export function useStreamChat({
             },
             onEnd: (response: ChatResponseEnd) => {
               pendingStreamChatIds.delete(chatId);
+              isPostEnd = true;
               void (async () => {
                 // Only mark as successful if NOT cancelled - wasCancelled flag is set
                 // by the backend when user cancels the stream
@@ -392,16 +401,23 @@ export function useStreamChat({
                   // Re-fetch messages to pick up server-assigned fields (e.g. commitHash)
                   // that may only be finalized at stream completion.
                   try {
+                    const chunkCountBeforeGetChat = postEndChunkCount;
                     const latestChat = await ipc.chat.getChat(chatId);
                     queryClient.setQueryData(
                       queryKeys.chats.detail({ chatId }),
                       latestChat,
                     );
-                    setMessagesById((prev) => {
-                      const next = new Map(prev);
-                      next.set(chatId, latestChat.messages);
-                      return next;
-                    });
+                    // Skip overwriting in-memory messages if background sub-agents
+                    // sent onChunk events while getChat() was in-flight — those
+                    // chunks already contain the latest content and the DB snapshot
+                    // may be stale relative to them.
+                    if (postEndChunkCount === chunkCountBeforeGetChat) {
+                      setMessagesById((prev) => {
+                        const next = new Map(prev);
+                        next.set(chatId, latestChat.messages);
+                        return next;
+                      });
+                    }
                   } catch (error) {
                     console.warn(
                       `[CHAT] Failed to refresh latest chat for ${chatId}:`,

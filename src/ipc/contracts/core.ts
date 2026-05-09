@@ -307,7 +307,9 @@ export function createStreamClient<
           contract.keyField
         ] as KeyValue;
         streams.get(key)?.onEnd(parsed.data);
-        streams.delete(key);
+        // Keep callbacks alive so post-end chunk events (e.g. background
+        // sub-agent finishes) still reach the frontend. A new stream for
+        // the same keyId overwrites them via streams.set() in start().
       }
     });
 

@@ -8,6 +8,7 @@ import { jsonrepair } from "jsonrepair";
 import { AgentToolConsent } from "@/lib/schemas";
 import { AgentTodo } from "@/ipc/types";
 import type { AppFrameworkType } from "@/lib/framework_constants";
+import type { AgentSwarm } from "./agent_swarm";
 
 // ============================================================================
 // XML Escape Helpers
@@ -99,6 +100,33 @@ export interface AgentContext {
    * Queues a warning toast to be shown to the user when the turn completes.
    */
   onWarningMessage?: (message: string) => void;
+  /**
+   * Spawns a sub-agent to complete a specific task.
+   * Only available when the handler wires it up (i.e. in the main agent context).
+   * Returns the sub-agent's final text response.
+   */
+  runSubAgent?: (
+    prompt: string,
+    description: string,
+    options?: {
+      /** Unique name for this agent in the swarm (used for inter-agent messaging) */
+      name?: string;
+      /** If true, spawn and return immediately. Agent reports via send_message. */
+      background?: boolean;
+      /** Message the leader pre-sends to the agent's inbox before it starts */
+      initialMessage?: string;
+    },
+  ) => Promise<string>;
+  /**
+   * In-session agent swarm for inter-agent messaging.
+   * Present on both the leader context and all sub-agent contexts.
+   */
+  swarm?: AgentSwarm;
+  /**
+   * This agent's registered name within the swarm.
+   * Undefined for the leader/main agent (which uses "leader").
+   */
+  agentName?: string;
 }
 
 // ============================================================================

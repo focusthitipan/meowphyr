@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { DyadError, DyadErrorKind } from "@/errors/dyad_error";
-import { ToolDefinition, AgentContext, Todo } from "./types";
+import { ToolDefinition, AgentContext, Todo, escapeXmlAttr } from "./types";
 import { saveTodos, deleteTodos } from "../todo_persistence";
 
 const todoSchema = z.object({
@@ -109,6 +109,18 @@ export const updateTodosTool: ToolDefinition<
     const count = args.todos.length;
     const completed = args.todos.filter((t) => t.status === "completed").length;
     return `${completed}/${count} todos completed`;
+  },
+
+  buildXml: (args, isComplete) => {
+    if (!isComplete) return undefined;
+    const todos = args.todos ?? [];
+    const inProgress = todos.filter((t) => t.status === "in_progress").length;
+    const pending = todos.filter((t) => t.status === "pending").length;
+    const completed = todos.filter((t) => t.status === "completed").length;
+    const label = args.merge
+      ? `📋 Todos: ${inProgress} active, ${pending} pending, ${completed} done`
+      : `📋 Todos (${todos.length} items)`;
+    return `<dyad-status title="${escapeXmlAttr(label)}" state="finished"></dyad-status>`;
   },
 
   execute: async (args, ctx: AgentContext) => {

@@ -3,6 +3,7 @@
  * Main orchestrator for tool-based agent mode with parallel execution
  */
 
+import crypto from "node:crypto";
 import { IpcMainInvokeEvent } from "electron";
 import {
   streamText,
@@ -58,6 +59,7 @@ import {
   parsePartialJson,
   escapeXmlAttr,
   escapeXmlContent,
+  unescapeXmlAttr,
   UserMessageContentPart,
   FileEditTracker,
 } from "./tools/types";
@@ -100,6 +102,11 @@ import {
   maybeAppendRetryReplayForRetry,
 } from "./retry_replay_utils";
 import { setChatSummaryTool } from "./tools/set_chat_summary";
+import { AgentSwarm } from "./tools/agent_swarm";
+import { createSendMessageTool } from "./tools/send_message_tool";
+import { createReadMessagesTool } from "./tools/read_messages_tool";
+import { createWaitForReplyTool } from "./tools/wait_for_reply_tool";
+import { createMonitorAgentsTool } from "./tools/monitor_agents_tool";
 
 const logger = log.scope("local_agent_handler");
 const PLANNING_QUESTIONNAIRE_TOOL_NAME = "planning_questionnaire";
@@ -286,6 +293,47 @@ function getMidTurnCompactionSummaryIds(
 }
 
 /**
+ * Replace the dyad-status block identified by slotId in content with replacement.
+ * Uses depth counting instead of a non-greedy regex so nested dyad-status tags
+ * (e.g. from bash tool results) are handled correctly.
+ */
+function replaceDyadStatusSlot(
+  content: string,
+  slotId: string,
+  replacement: string,
+): string {
+  const slotOpenRe = new RegExp(
+    `<dyad-status[^>]*data-slot="${slotId}"[^>]*>`,
+  );
+  const slotMatch = slotOpenRe.exec(content);
+  if (!slotMatch) return content;
+
+  const startIdx = slotMatch.index;
+  const OPEN_TOKEN = "<dyad-status";
+  const CLOSE_TOKEN = "</dyad-status>";
+  let depth = 0;
+  let i = startIdx;
+
+  while (i < content.length) {
+    const nextOpen = content.indexOf(OPEN_TOKEN, i);
+    const nextClose = content.indexOf(CLOSE_TOKEN, i);
+    if (nextClose === -1) break;
+    if (nextOpen !== -1 && nextOpen < nextClose) {
+      depth++;
+      i = nextOpen + OPEN_TOKEN.length;
+    } else {
+      depth--;
+      const endIdx = nextClose + CLOSE_TOKEN.length;
+      if (depth === 0) {
+        return content.slice(0, startIdx) + replacement + content.slice(endIdx);
+      }
+      i = endIdx;
+    }
+  }
+  return content;
+}
+
+/**
  * Handle a chat stream in local-agent mode
  */
 export async function handleLocalAgentStream(
@@ -336,6 +384,30 @@ export async function handleLocalAgentStream(
     settings.maxToolCallSteps ?? DEFAULT_MAX_TOOL_CALL_STEPS;
   let fullResponse = "";
   let streamingPreview = ""; // Temporary preview for current tool, not persisted
+  // Each parallel sub-agent gets its own streaming slot keyed by a random ID.
+  // This allows multiple sub-agents to stream simultaneously without overwriting each other.
+  const subAgentPreviews = new Map<string, string>();
+  // Maps placeholder marker → slotId for inline replacement in fullResponse
+  const subAgentMarkers = new Map<string, string>();
+
+  function sendCurrentView() {
+    let combined = fullResponse + streamingPreview;
+    // Replace marker placeholders with live slot content (inline positioning)
+    for (const [marker, slotId] of subAgentMarkers) {
+      const preview = subAgentPreviews.get(slotId);
+      if (preview) {
+        combined = combined.replace(marker, preview);
+      }
+    }
+    sendResponseChunk(
+      event,
+      req.chatId,
+      chat,
+      combined,
+      placeholderMessageId,
+      hiddenMessageIdsForStreaming,
+    );
+  }
   let activeRetryReplayEvents: RetryReplayEvent[] | null = null;
   // Mid-turn compaction inserts a DB summary row for LLM history, but we render
   // the user-facing compaction indicator inline in the active assistant turn.
@@ -531,6 +603,19 @@ export async function handleLocalAgentStream(
     const referencedAppsMap = new Map(
       referencedApps.map((ref) => [ref.appName.toLowerCase(), ref.appPath]),
     );
+    // In-session swarm for inter-agent messaging (leader + all sub-agents share this)
+    const swarm = new AgentSwarm();
+    swarm.register("leader");
+    // Permission bridge: sub-agents route consent requests through the leader,
+    // which shows the real Electron consent UI to the user.
+    swarm.setPermissionHandler(async (fromAgent, toolName, inputPreview) => {
+      return requireAgentToolConsent(event, {
+        chatId: chat.id,
+        toolName: toolName as AgentToolName,
+        toolDescription: `[from sub-agent "${fromAgent}"]`,
+        inputPreview,
+      });
+    });
     const ctx: AgentContext = {
       event,
       appId: chat.app.id,
@@ -550,31 +635,15 @@ export async function handleLocalAgentStream(
       fileEditTracker,
       isDyadPro: true,
       onXmlStream: (accumulatedXml: string) => {
-        // Stream accumulated XML to UI without persisting
         streamingPreview = accumulatedXml;
-        sendResponseChunk(
-          event,
-          req.chatId,
-          chat,
-          fullResponse + streamingPreview,
-          placeholderMessageId,
-          hiddenMessageIdsForStreaming,
-        );
+        sendCurrentView();
       },
       onXmlComplete: (finalXml: string) => {
-        // Write final XML to DB and UI
         const xmlChunk = `${finalXml}\n`;
         fullResponse += xmlChunk;
-        streamingPreview = ""; // Clear preview
+        streamingPreview = "";
         updateResponseInDb(placeholderMessageId, fullResponse);
-        sendResponseChunk(
-          event,
-          req.chatId,
-          chat,
-          fullResponse,
-          placeholderMessageId,
-          hiddenMessageIdsForStreaming,
-        );
+        sendCurrentView();
       },
       requireConsent: async (params: {
         toolName: string;
@@ -600,6 +669,454 @@ export async function handleLocalAgentStream(
       onWarningMessage: (message) => {
         warningMessages.push(message);
       },
+      swarm,
+      agentName: "leader",
+      runSubAgent: async (
+        prompt: string,
+        description: string,
+        options?: { name?: string; background?: boolean; initialMessage?: string },
+      ) => {
+        const agentName = options?.name ?? `agent-${crypto.randomUUID().slice(0, 8)}`;
+        const title = `Agent[${agentName}]: ${description || "Task"}`;
+        // Register in swarm so other agents can message this one by name
+        swarm.register(agentName);
+        swarm.markRunning(agentName);
+        // Pre-populate inbox with leader's initial message if provided
+        if (options?.initialMessage) {
+          swarm.send("leader", agentName, "task", options.initialMessage);
+        }
+        // Unique slot for this sub-agent's streaming preview.
+        const slotId = crypto.randomUUID();
+        // For background agents, embed an inline marker in fullResponse so the
+        // card appears at the position where the agent tool was called.
+        const marker = options?.background
+          ? `\x00SUBAGENT:${slotId}\x00`
+          : "";
+        if (marker) {
+          subAgentMarkers.set(marker, slotId);
+          fullResponse += marker;
+        }
+
+        type LogEntry =
+          | { kind: "activity"; text: string }
+          | { kind: "text"; text: string }
+          | { kind: "xml"; xml: string };
+        const logEntries: LogEntry[] = [];
+        let pendingText = "";
+        // Maps toolCallId → activity label for tools currently streaming their args
+        const streamingActivities = new Map<string, string>();
+        // Maps toolCallId → label for tools whose args are done and are now executing
+        const executingActivities = new Map<string, string>();
+
+        function flushPendingText() {
+          const trimmed = pendingText.trimEnd();
+          if (trimmed) logEntries.push({ kind: "text", text: trimmed });
+          pendingText = "";
+        }
+
+        function xmlToActivity(xml: string): string | null {
+          const tagMatch = xml.match(/^<(dyad-[\w-]+)([^>]*)/);
+          if (!tagMatch) return null;
+          const tagName = tagMatch[1];
+          const attrsStr = tagMatch[2];
+          const getAttr = (name: string): string | undefined => {
+            const m = attrsStr.match(new RegExp(`\\b${name}="([^"]*)"`));
+            return m ? unescapeXmlAttr(m[1]) : undefined;
+          };
+          switch (tagName) {
+            case "dyad-grep":
+              return `🔍 grep: ${getAttr("query") ?? ""}`;
+            case "dyad-read":
+              return `📄 read: ${getAttr("path") ?? ""}`;
+            case "dyad-list-files": {
+              const pattern = getAttr("pattern");
+              const directory = getAttr("directory");
+              if (pattern) return `📁 glob: ${pattern}`;
+              if (directory) return `📋 list: ${directory}/`;
+              return "📋 list files";
+            }
+            case "dyad-code-search":
+              return `🔎 code search: ${getAttr("query") ?? ""}`;
+            case "dyad-fetch":
+              return `🌐 fetch: ${getAttr("url") ?? ""}`;
+            case "dyad-search":
+              return `🌐 web search: ${getAttr("query") ?? ""}`;
+            case "dyad-status": {
+              const statusTitle = getAttr("title");
+              return statusTitle ? `⚙️ ${statusTitle}` : null;
+            }
+            default:
+              return `⚙️ ${tagName.replace("dyad-", "")}`;
+          }
+        }
+
+        const MAX_PENDING_TAIL = 2_000; // show tail of actively-streaming text
+
+        function buildBlockContent(extraPendingText?: string): string {
+          // Build interleaved content: text entries are escaped, xml entries are
+          // kept raw so DyadMarkdownParser can render them as full components.
+          // We process logEntries in order to preserve call-site positioning.
+          const parts: string[] = [];
+          const pendingTextLines: string[] = [];
+
+          function flushTextLines() {
+            if (pendingTextLines.length > 0) {
+              parts.push(escapeXmlContent(pendingTextLines.join("\n")));
+              pendingTextLines.length = 0;
+            }
+          }
+
+          for (const entry of logEntries) {
+            if (entry.kind === "activity") {
+              pendingTextLines.push(entry.text);
+            } else if (entry.kind === "text") {
+              pendingTextLines.push(`  ${entry.text}`);
+            } else if (entry.kind === "xml") {
+              flushTextLines();
+              parts.push(entry.xml);
+            }
+          }
+
+          // Streaming/executing activity labels always go at the tail (escaped)
+          for (const activity of streamingActivities.values()) {
+            pendingTextLines.push(`${activity}...`);
+          }
+          for (const activity of executingActivities.values()) {
+            pendingTextLines.push(`${activity}...`);
+          }
+          const pending = (extraPendingText ?? "").trimEnd();
+          if (pending) {
+            const tail =
+              pending.length > MAX_PENDING_TAIL
+                ? `…\n${pending.slice(-MAX_PENDING_TAIL)}`
+                : pending;
+            pendingTextLines.push(tail);
+          }
+          flushTextLines();
+
+          return parts.join("\n");
+        }
+
+        /** Write the current state of this sub-agent into its streaming slot.
+         *  @param hintActivity Fallback label shown when no tool is active (e.g. "✍️ Writing...") */
+        function updateSlot(innerContent: string, hintActivity?: string) {
+          // Tools take priority; fall back to the caller-supplied hint (text/reasoning phase)
+          const currentActivity =
+            [...executingActivities.values()].at(-1) ??
+            [...streamingActivities.values()].at(-1) ??
+            hintActivity ??
+            "";
+          const activityAttr = currentActivity
+            ? ` activity="${escapeXmlAttr(currentActivity)}"`
+            : "";
+          const newTag = `<dyad-status data-slot="${slotId}" title="${escapeXmlAttr(title)}" state="pending"${activityAttr}>\n${innerContent}\n</dyad-status>`;
+          subAgentPreviews.set(slotId, newTag);
+          if (options?.background) {
+            // After the main agent finishes, the marker has been resolved into
+            // fullResponse as a static pending block. sendCurrentView() only
+            // replaces markers (now cleared), so it can't inject the new content.
+            // Update fullResponse directly so streaming continues to reach the UI.
+            if (marker && !subAgentMarkers.has(marker)) {
+              const replaced = replaceDyadStatusSlot(fullResponse, slotId, newTag);
+              if (replaced !== fullResponse) fullResponse = replaced;
+            }
+          } else {
+            // Foreground sub-agent: the main loop is paused awaiting runSubAgent(),
+            // so streamingPreview is free to use as the live display channel.
+            // ctx.onXmlComplete() will clear it and commit the finished card.
+            streamingPreview = newTag;
+          }
+          sendCurrentView();
+        }
+
+        // Claim the slot immediately so the block appears in the UI right away
+        updateSlot(buildBlockContent());
+
+        const subCtx: AgentContext = {
+          ...ctx,
+          onXmlStream: (_xml) => {
+            // Activities are tracked via streamingActivities/executingActivities Maps;
+            // just refresh the slot to pick up any label updates.
+            updateSlot(buildBlockContent());
+          },
+          onXmlComplete: (xml) => {
+            flushPendingText();
+            // Don't embed dyad-status inside the slot — nested dyad-status tags
+            // break the regex-based slot replacement and overflow the parser.
+            // Use a text label instead for status-type outputs.
+            if (xml.trimStart().startsWith("<dyad-status")) {
+              const activity = xmlToActivity(xml);
+              if (activity) logEntries.push({ kind: "activity", text: activity });
+            } else {
+              logEntries.push({ kind: "xml", xml });
+            }
+            updateSlot(buildBlockContent());
+          },
+          // Background agents auto-approve tools (they were delegated by leader).
+          // Foreground agents still go through the leader's consent UI.
+          requireConsent: options?.background
+            ? async () => true
+            : async (params) => {
+                return swarm.requestPermission(
+                  agentName,
+                  params.toolName,
+                  params.inputPreview ?? "",
+                );
+              },
+          runSubAgent: undefined,
+          swarm,
+          agentName,
+        };
+
+        const subToolSet = {
+          ...buildAgentToolSet(subCtx),
+          send_message: createSendMessageTool(agentName, swarm, {
+            onLog: (to, type, content) => {
+              // Show outgoing messages (especially reports) in the sub-agent card.
+              const preview =
+                content.length > 300
+                  ? content.slice(0, 300) + "…"
+                  : content;
+              logEntries.push({
+                kind: "text",
+                text: `📤 ${type} → ${to}:\n${preview}`,
+              });
+              updateSlot(buildBlockContent());
+            },
+          }),
+          read_messages: createReadMessagesTool(agentName, swarm, {
+            onLog: (msgs) => {
+              if (msgs.length === 0) {
+                logEntries.push({ kind: "text", text: "📥 read messages: no new messages" });
+              } else {
+                const lines = msgs.map(
+                  (m) =>
+                    `${m.type.toUpperCase()} from "${m.from}": ${m.content.slice(0, 150)}${m.content.length > 150 ? "…" : ""}`,
+                );
+                logEntries.push({
+                  kind: "text",
+                  text: `📥 read messages (${msgs.length}):\n${lines.join("\n")}`,
+                });
+              }
+              updateSlot(buildBlockContent());
+            },
+          }),
+          wait_for_reply: createWaitForReplyTool(agentName, swarm, {
+            createCallbacks: () => ({
+              onLog: (msg) => {
+                if (msg) {
+                  const preview =
+                    msg.content.length > 150
+                      ? msg.content.slice(0, 150) + "…"
+                      : msg.content;
+                  logEntries.push({
+                    kind: "text",
+                    text: `📨 received ${msg.type} from "${msg.from}":\n${preview}`,
+                  });
+                } else {
+                  logEntries.push({ kind: "text", text: "⏰ wait timeout — no reply received" });
+                }
+                updateSlot(buildBlockContent());
+              },
+            }),
+          }),
+        };
+
+        const subStreamingEntries = new Map<
+          string,
+          { toolName: string; argsAccumulated: string }
+        >();
+
+        // Background agents use their own AbortController so they survive
+        // after the main agent's abortController is cleaned up. They're
+        // aborted only when the user cancels the main chat.
+        const bgAbort = options?.background ? new AbortController() : null;
+        if (bgAbort) {
+          // Inherit cancellation from parent: if main is aborted, kill bg too
+          abortController.signal.addEventListener(
+            "abort",
+            () => bgAbort.abort(),
+            { once: true },
+          );
+        }
+
+        const bgSuffix = options?.background
+          ? `\n\nIMPORTANT: You are running in background mode. When you finish, send a comprehensive summary to the leader via send_message(to: "leader", type: "report", content: <your summary>).`
+          : "";
+        const subStreamResult = streamText({
+          model: modelClient.model,
+          system: `You are a focused sub-agent. Your task: ${description}\n\nThink step-by-step. Use the available tools to complete the task. Explain your reasoning between tool calls, then return a clear, concise summary of what you did and the outcome.\n\nIMPORTANT: If you produce deliverables that the leader should review (reports, analysis results, summaries, findings), write them to \`.meowphyr/\`. Use unique filenames that include your agent name to avoid overwriting other agents' files (e.g. \`.meowphyr/report-explorer-structure.md\`, not just \`.meowphyr/report.md\`). This directory is the handoff point — the leader reads files from here.${bgSuffix}`,
+          messages: [{ role: "user", content: prompt }],
+          tools: subToolSet,
+          stopWhen: stepCountIs(20),
+          abortSignal: (bgAbort ?? abortController).signal,
+        });
+
+        const subFullStream = subStreamResult.fullStream;
+        cancelOrphanedBaseStream(subStreamResult);
+
+        /** Runs the stream-to-finish for a sub-agent (for-await + finalization) */
+        async function runAgentStream(): Promise<string> {
+          let pendingReasoning = "";
+          const signal = (bgAbort ?? abortController).signal;
+
+          for await (const part of subFullStream) {
+            if (signal.aborted) break;
+
+            switch (part.type) {
+              case "reasoning-start":
+                flushPendingText();
+                break;
+
+              case "reasoning-delta":
+                pendingReasoning += part.text;
+                updateSlot(buildBlockContent(`💭 ${pendingReasoning}`), "💭 Thinking...");
+                break;
+
+              case "reasoning-end":
+                if (pendingReasoning.trim()) {
+                  logEntries.push({
+                    kind: "text",
+                    text: `💭 ${pendingReasoning.trimEnd()}`,
+                  });
+                }
+                pendingReasoning = "";
+                updateSlot(buildBlockContent());
+                break;
+
+              case "text-delta":
+                pendingText += part.text;
+                updateSlot(buildBlockContent(pendingText), "✍️ Writing...");
+                break;
+
+              case "tool-input-start":
+                flushPendingText();
+                subStreamingEntries.set(part.id, {
+                  toolName: part.toolName,
+                  argsAccumulated: "",
+                });
+                // Show tool name immediately while args stream in
+                streamingActivities.set(part.id, `⚙️ ${part.toolName}...`);
+                updateSlot(buildBlockContent());
+                break;
+
+              case "tool-input-delta": {
+                const entry = subStreamingEntries.get(part.id);
+                if (entry) {
+                  entry.argsAccumulated += part.delta;
+                  // Swarm tools (send_message, read_messages, wait_for_reply) are
+                  // not in TOOL_DEFINITIONS — keep the generic label from tool-input-start.
+                  const toolDef = TOOL_DEFINITIONS.find(
+                    (t) => t.name === entry.toolName,
+                  );
+                  if (toolDef?.buildXml) {
+                    const partialArgs = parsePartialJson(entry.argsAccumulated);
+                    const xml = toolDef.buildXml(partialArgs, false);
+                    if (xml) {
+                      const act = xmlToActivity(xml);
+                      if (act) streamingActivities.set(part.id, act);
+                      updateSlot(buildBlockContent());
+                    }
+                  }
+                }
+                break;
+              }
+
+              case "tool-input-end": {
+                const act = streamingActivities.get(part.id);
+                streamingActivities.delete(part.id);
+                if (act) executingActivities.set(part.id, act);
+                const seEntry = subStreamingEntries.get(part.id);
+                subStreamingEntries.delete(part.id);
+                if (seEntry) {
+                  // Swarm tools have no buildXml — keep the generic label.
+                  const toolDef = TOOL_DEFINITIONS.find(
+                    (t) => t.name === seEntry.toolName,
+                  );
+                  if (toolDef?.buildXml) {
+                    const finalArgs = parsePartialJson(seEntry.argsAccumulated);
+                    const xml = toolDef.buildXml(finalArgs, true);
+                    if (xml) {
+                      // buildXml returned a string → emit the complete tool XML now.
+                      // (if undefined, execute() will call subCtx.onXmlComplete itself)
+                      subCtx.onXmlComplete(xml);
+                    }
+                  }
+                }
+                updateSlot(buildBlockContent());
+                break;
+              }
+
+              case "tool-result": {
+                executingActivities.delete(part.toolCallId);
+                updateSlot(buildBlockContent());
+                break;
+              }
+            }
+          }
+
+          flushPendingText();
+
+          const finalText = await subStreamResult.text; // ensure stream is fully consumed
+
+          // buildBlockContent() already has all text and xml entries interleaved
+          // in call-site order — use it directly for the finished card content.
+          const finalInnerContent = buildBlockContent();
+
+          if (options?.background) {
+            const finishTag = `<dyad-status data-slot="${slotId}" title="${escapeXmlAttr(title)}" state="finished">\n${finalInnerContent}\n</dyad-status>`;
+            subAgentPreviews.set(slotId, finishTag);
+            const replaced = replaceDyadStatusSlot(fullResponse, slotId, finishTag);
+            if (replaced !== fullResponse) {
+              fullResponse = replaced;
+            } else if (marker) {
+              fullResponse = fullResponse.replace(marker, finishTag + "\n");
+            }
+            if (marker) subAgentMarkers.delete(marker);
+            await updateResponseInDb(placeholderMessageId, fullResponse);
+            sendCurrentView();
+            swarm.markCompleted(agentName);
+            swarm.send(
+              agentName,
+              "leader",
+              "report",
+              `Agent "${agentName}" completed: ${description}\n\n${finalText}`,
+            );
+          } else {
+            swarm.markCompleted(agentName);
+            subAgentPreviews.delete(slotId);
+            ctx.onXmlComplete(
+              `<dyad-status title="${escapeXmlAttr(title)}" state="finished">\n${finalInnerContent}\n</dyad-status>`,
+            );
+          }
+
+          return finalText;
+        }
+
+        if (options?.background) {
+          // Fire-and-forget: the agent runs in the background and reports
+          // results via send_message when done.
+          runAgentStream().catch((err) => {
+            logger.error(`Background agent "${agentName}" failed:`, err);
+            const errorXml = `<dyad-status title="${escapeXmlAttr(title)}" state="aborted">\n${escapeXmlContent(`Error: ${getErrorMessage(err)}`)}\n</dyad-status>`;
+            subAgentPreviews.set(slotId, errorXml);
+            fullResponse = fullResponse.replace(marker, errorXml + "\n");
+            subAgentMarkers.delete(marker);
+            updateResponseInDb(placeholderMessageId, fullResponse);
+            sendCurrentView();
+            swarm.markFailed(agentName, getErrorMessage(err));
+            swarm.send(
+              agentName,
+              "leader",
+              "report",
+              `Agent "${agentName}" failed: ${getErrorMessage(err)}`,
+            );
+          });
+          return `Agent "${agentName}" started in background. It will report results via send_message when done. Use read_messages to check for results.`;
+        }
+
+        return runAgentStream();
+      },
     };
 
     // Build tool set (agent tools + MCP tools)
@@ -613,7 +1130,84 @@ export async function handleLocalAgentStream(
     });
     const mcpTools =
       readOnly || planModeOnly ? {} : await getMcpTools(event, ctx);
-    const allTools: ToolSet = { ...agentTools, ...mcpTools };
+    // Leader swarm tools — lets the main agent communicate with workers
+    const leaderSwarmTools = {
+      send_message: createSendMessageTool("leader", swarm, {
+        onLog: (to, type, content) => {
+          const preview = content.length > 300 ? content.slice(0, 300) + "…" : content;
+          ctx.onXmlComplete(
+            `<dyad-status title="📤 ${type} → ${escapeXmlAttr(to)}" state="finished">${escapeXmlContent(preview)}</dyad-status>`,
+          );
+        },
+      }),
+      read_messages: createReadMessagesTool("leader", swarm, {
+        onLog: (msgs) => {
+          if (msgs.length === 0) {
+            ctx.onXmlComplete(
+              `<dyad-status title="📥 Read messages" state="finished">No messages.</dyad-status>`,
+            );
+          } else {
+            const preview = msgs
+              .map(
+                (m) =>
+                  `${m.type.toUpperCase()} from "${m.from}":\n${m.content.slice(0, 500)}${m.content.length > 500 ? "…" : ""}`,
+              )
+              .join("\n\n---\n\n");
+            ctx.onXmlComplete(
+              `<dyad-status title="📥 ${msgs.length} message(s)" state="finished">${escapeXmlContent(preview)}</dyad-status>`,
+            );
+          }
+        },
+      }),
+      wait_for_reply: createWaitForReplyTool("leader", swarm, {
+        // createCallbacks is called once per execution so that parallel
+        // wait_for_reply calls each get their own dedicated UI slot.
+        // Without this, all pending cards share a single streamingPreview
+        // (showing only 1), while all completions each append to fullResponse
+        // (showing N timeout/result cards) — an inconsistent mismatch.
+        createCallbacks: () => {
+          const slotId = crypto.randomUUID();
+          const marker = `\x00WAITREPLY:${slotId}\x00`;
+          fullResponse += marker;
+          subAgentMarkers.set(marker, slotId);
+
+          return {
+            onStart: (waitingFor) => {
+              const label = waitingFor ? `Waiting for "${waitingFor}"…` : "Waiting for replies…";
+              const pendingCard = `<dyad-status data-slot="${slotId}" title="${escapeXmlAttr(label)}" state="pending"></dyad-status>`;
+              subAgentPreviews.set(slotId, pendingCard);
+              sendCurrentView();
+            },
+            onLog: (msg) => {
+              let finalCard: string;
+              if (msg) {
+                finalCard = `<dyad-status data-slot="${slotId}" title="📥 ${msg.type.toUpperCase()} from &quot;${escapeXmlAttr(msg.from)}&quot;" state="finished">${escapeXmlContent(msg.content.slice(0, 500))}${msg.content.length > 500 ? "…" : ""}</dyad-status>`;
+              } else {
+                finalCard = `<dyad-status data-slot="${slotId}" title="⏰ Wait timeout" state="finished">No reply received.</dyad-status>`;
+              }
+              subAgentPreviews.set(slotId, finalCard);
+              const replaced = replaceDyadStatusSlot(fullResponse, slotId, finalCard);
+              if (replaced !== fullResponse) {
+                fullResponse = replaced;
+              } else {
+                fullResponse = fullResponse.replace(marker, finalCard + "\n");
+              }
+              subAgentMarkers.delete(marker);
+              updateResponseInDb(placeholderMessageId, fullResponse);
+              sendCurrentView();
+            },
+          };
+        },
+      }),
+      monitor_agents: createMonitorAgentsTool("leader", swarm, {
+        onLog: (result) => {
+          ctx.onXmlComplete(
+            `<dyad-status title="🔭 Agent status" state="finished">${escapeXmlContent(result)}</dyad-status>`,
+          );
+        },
+      }),
+    };
+    const allTools: ToolSet = { ...agentTools, ...mcpTools, ...leaderSwarmTools };
 
     // Prepare message history with graceful fallback
     // Use messageOverride if provided (e.g., for summarization)
@@ -957,9 +1551,15 @@ export async function handleLocalAgentStream(
             onError: (error: any) => {
               const normalizedError = unwrapStreamError(error);
               streamErrorFromCallback = normalizedError;
+              const extra: Record<string, unknown> = {};
+              if (isRecord(normalizedError)) {
+                if (normalizedError.responseBody) extra.responseBody = normalizedError.responseBody;
+                if (normalizedError.statusCode) extra.statusCode = normalizedError.statusCode;
+                if (normalizedError.url) extra.url = normalizedError.url;
+              }
               logger.error(
-                "Local agent stream error:",
-                getErrorMessage(normalizedError),
+                `Local agent stream error: ${getErrorMessage(normalizedError)}`,
+                Object.keys(extra).length > 0 ? extra : undefined,
               );
             },
           });
@@ -1069,6 +1669,13 @@ export async function handleLocalAgentStream(
                       const xml = toolDef.buildXml(argsPartial, true);
                       if (xml) {
                         ctx.onXmlComplete(xml);
+                      } else {
+                        // Tool opts out of a completion block (e.g. agent tool
+                        // whose output is managed by runSubAgent). Clear any
+                        // stale streaming preview so it doesn't duplicate the
+                        // slot the tool will create during execution.
+                        streamingPreview = "";
+                        sendCurrentView();
                       }
                     }
                   }
@@ -1091,14 +1698,7 @@ export async function handleLocalAgentStream(
               if (chunk) {
                 fullResponse += chunk;
                 await updateResponseInDb(placeholderMessageId, fullResponse);
-                sendResponseChunk(
-                  event,
-                  req.chatId,
-                  chat,
-                  fullResponse,
-                  placeholderMessageId,
-                  hiddenMessageIdsForStreaming,
-                );
+                sendCurrentView();
               }
             }
           } catch (error) {
@@ -1329,14 +1929,7 @@ export async function handleLocalAgentStream(
       postTurnXmlParts.push(stepLimitXml);
       fullResponse += `\n\n${stepLimitXml}`;
       await updateResponseInDb(placeholderMessageId, fullResponse);
-      sendResponseChunk(
-        event,
-        req.chatId,
-        chat,
-        fullResponse,
-        placeholderMessageId,
-        hiddenMessageIdsForStreaming,
-      );
+      sendCurrentView();
     }
 
     // In read-only and plan mode, skip the deploy step (commit follows below)
@@ -1429,6 +2022,19 @@ export async function handleLocalAgentStream(
       }
     }
 
+    // Replace remaining inline markers with current slot content so
+    // background agent cards survive the chat:response:end transition.
+    for (const [marker, slotId] of subAgentMarkers) {
+      const preview = subAgentPreviews.get(slotId);
+      if (preview) {
+        fullResponse = fullResponse.replace(marker, preview + "\n");
+      } else {
+        fullResponse = fullResponse.replace(marker, "");
+      }
+    }
+    subAgentMarkers.clear();
+    await updateResponseInDb(placeholderMessageId, fullResponse);
+
     // Send completion
     safeSend(event.sender, "chat:response:end", {
       chatId: req.chatId,
@@ -1457,7 +2063,16 @@ export async function handleLocalAgentStream(
       return false; // Cancelled - don't consume quota
     }
 
-    logger.error("Local agent error:", error);
+    const errDetail: Record<string, unknown> = {};
+    if (isRecord(error)) {
+      if (error.responseBody) errDetail.responseBody = error.responseBody;
+      if (error.statusCode) errDetail.statusCode = error.statusCode;
+      if (error.url) errDetail.url = error.url;
+    }
+    logger.error(
+      `Local agent error: ${getErrorMessage(error)}`,
+      Object.keys(errDetail).length > 0 ? errDetail : undefined,
+    );
     safeSend(event.sender, "chat:response:error", {
       chatId: req.chatId,
       error: `Error: ${getErrorMessage(error)}`,

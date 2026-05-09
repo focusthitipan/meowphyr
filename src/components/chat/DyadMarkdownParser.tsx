@@ -728,6 +728,7 @@ function renderCustomTag(
           node={{
             properties: {
               directory: attributes.directory || "",
+              pattern: attributes.pattern || "",
               recursive: attributes.recursive || "",
               include_ignored:
                 attributes.include_ignored || attributes.include_hidden || "",
@@ -857,8 +858,10 @@ function renderCustomTag(
                 inProgress,
                 explicitState: attributes.state,
               }),
+              activity: attributes.activity || undefined,
             },
           }}
+          renderContent={(text) => <DyadMarkdownParser content={text} />}
         >
           {content}
         </DyadStatus>

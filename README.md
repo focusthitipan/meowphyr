@@ -20,7 +20,7 @@ This is a personal fork of [dyad-sh/dyad](https://github.com/dyad-sh/dyad) with 
 
 ---
 
-Dyad is a local, open-source AI app builder. It's fast, private, and fully under your control — like Lovable, v0, or Bolt, but running right on your machine.
+Meowphyr is a local, open-source AI app builder. It's fast, private, and fully under your control — like Lovable, v0, or Bolt, but running right on your machine.
 
 More info about the original project: [https://dyad.sh/](https://dyad.sh/)
 
@@ -34,7 +34,7 @@ More info about the original project: [https://dyad.sh/](https://dyad.sh/)
 
 No sign-up required. Just download and go.
 
-Releases for this fork: [https://github.com/focusthitipan/dyad/releases](https://github.com/focusthitipan/dyad/releases)
+Releases for this fork: [https://github.com/focusthitipan/meowphyr/releases](https://github.com/focusthitipan/meowphyr/releases)
 
 ## 🛠️ Contributing
 
