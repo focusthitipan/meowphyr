@@ -617,7 +617,7 @@ export function ChatTabs({ selectedChatId }: ChatTabsProps) {
                     >
                       {inProgress && (
                         <span
-                          className="flex items-center text-purple-600"
+                          className="flex items-center text-blue-500"
                           aria-label={t("chatInProgress")}
                           title={t("chatInProgress")}
                         >
@@ -744,7 +744,7 @@ export function ChatTabs({ selectedChatId }: ChatTabsProps) {
                   >
                     {inProgress && (
                       <span
-                        className="flex items-center text-purple-600"
+                        className="flex items-center text-blue-500"
                         aria-label={t("chatInProgress")}
                         title={t("chatInProgress")}
                       >

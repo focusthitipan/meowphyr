@@ -1493,8 +1493,8 @@ export const PreviewIframe = ({ loading }: { loading: boolean }) => {
                     onClick={handleActivateComponentSelector}
                     className={`p-1 rounded transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
                       isPicking
-                        ? "bg-purple-500 text-white hover:bg-purple-600 dark:bg-purple-600 dark:hover:bg-purple-700"
-                        : " text-purple-700 hover:bg-purple-200  dark:text-purple-300 dark:hover:bg-purple-900"
+                        ? "bg-blue-500 text-white hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700"
+                        : " text-blue-700 hover:bg-blue-200  dark:text-blue-300 dark:hover:bg-blue-900"
                     }`}
                     disabled={
                       loading ||
@@ -1520,8 +1520,8 @@ export const PreviewIframe = ({ loading }: { loading: boolean }) => {
                     onClick={handleAnnotatorClick}
                     className={`p-1 rounded transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
                       annotatorMode
-                        ? "bg-purple-500 text-white hover:bg-purple-600 dark:bg-purple-600 dark:hover:bg-purple-700"
-                        : " text-purple-700 hover:bg-purple-200  dark:text-purple-300 dark:hover:bg-purple-900"
+                        ? "bg-blue-500 text-white hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700"
+                        : " text-blue-700 hover:bg-blue-200  dark:text-blue-300 dark:hover:bg-blue-900"
                     }`}
                     disabled={
                       loading ||
