@@ -868,8 +868,29 @@ export async function handleLocalAgentStream(
           agentName,
         };
 
+        const subAgentPermission = settings.subAgentFileAccess ?? "staging";
+        const baseSubTools = buildAgentToolSet(subCtx, {
+          subAgentPermission,
+        });
+
+        // In staging mode, wrap write_file to enforce .meowphyr/ path prefix
+        if (subAgentPermission === "staging" && baseSubTools.write_file) {
+          const original = baseSubTools.write_file;
+          baseSubTools.write_file = {
+            ...original,
+            execute: async (args: { path: string; content: string; description?: string }) => {
+              const STAGING_DIR = ".meowphyr";
+              const normalizedPath = args.path.replace(/\\/g, "/");
+              const safePath = normalizedPath.startsWith(STAGING_DIR + "/") || normalizedPath === STAGING_DIR
+                ? normalizedPath
+                : `${STAGING_DIR}/${normalizedPath.replace(/^\/+/, "")}`;
+              return original.execute({ ...args, path: safePath });
+            },
+          };
+        }
+
         const subToolSet = {
-          ...buildAgentToolSet(subCtx),
+          ...baseSubTools,
           send_message: createSendMessageTool(agentName, swarm, {
             onLog: (to, type, content) => {
               // Show outgoing messages (especially reports) in the sub-agent card.
@@ -943,9 +964,15 @@ export async function handleLocalAgentStream(
         const bgSuffix = options?.background
           ? `\n\nIMPORTANT: You are running in background mode. When you finish, send a comprehensive summary to the leader via send_message(to: "leader", type: "report", content: <your summary>).`
           : "";
+        const permissionSuffix =
+          subAgentPermission === "read-only"
+            ? `\n\nFILE ACCESS: Read-only mode. You cannot write, edit, or delete files. Report your findings as text or send a message to the leader.`
+            : subAgentPermission === "staging"
+              ? `\n\nFILE ACCESS: Staging mode. You may only write files to the \`.meowphyr/\` directory (enforced automatically). Use unique filenames that include your agent name to avoid conflicts (e.g. \`.meowphyr/report-${agentName}.md\`). This staging directory is the handoff point — the leader reads files from here.`
+              : `\n\nFILE ACCESS: Full access. You may read and write files anywhere in the project.`;
         const subStreamResult = streamText({
           model: modelClient.model,
-          system: `You are a focused sub-agent. Your task: ${description}\n\nThink step-by-step. Use the available tools to complete the task. Explain your reasoning between tool calls, then return a clear, concise summary of what you did and the outcome.\n\nIMPORTANT: If you produce deliverables that the leader should review (reports, analysis results, summaries, findings), write them to \`.meowphyr/\`. Use unique filenames that include your agent name to avoid overwriting other agents' files (e.g. \`.meowphyr/report-explorer-structure.md\`, not just \`.meowphyr/report.md\`). This directory is the handoff point — the leader reads files from here.${bgSuffix}`,
+          system: `You are a focused sub-agent. Your task: ${description}\n\nThink step-by-step. Use the available tools to complete the task. Explain your reasoning between tool calls, then return a clear, concise summary of what you did and the outcome.${permissionSuffix}${bgSuffix}`,
           messages: [{ role: "user", content: prompt }],
           tools: subToolSet,
           stopWhen: stepCountIs(20),
@@ -1128,6 +1155,22 @@ export async function handleLocalAgentStream(
       planModeOnly,
       basicAgentMode: !readOnly && !planModeOnly && isBasicAgentMode(settings),
     });
+
+    // Patch agent tool description so leader knows what sub-agents can/cannot do
+    if (agentTools.agent) {
+      const subAgentPerm = settings.subAgentFileAccess ?? "staging";
+      const permNote =
+        subAgentPerm === "read-only"
+          ? "IMPORTANT: Sub-agents are in read-only mode — they can read files and search but cannot write, edit, or delete any files. Only delegate research and analysis tasks."
+          : subAgentPerm === "staging"
+            ? "IMPORTANT: Sub-agents can only write files to the .meowphyr/ staging directory (enforced). Delegate research tasks and report-writing; the leader must apply staged outputs to the real project."
+            : "Sub-agents have full file access.";
+      agentTools.agent = {
+        ...agentTools.agent,
+        description: agentTools.agent.description + `\n\n${permNote}`,
+      };
+    }
+
     const mcpTools =
       readOnly || planModeOnly ? {} : await getMcpTools(event, ctx);
     // Leader swarm tools — lets the main agent communicate with workers

@@ -1,5 +1,19 @@
 ﻿{
   "title": "Settings",
+  "goBack": "Go Back",
+  "sidebar": {
+    "searchPlaceholder": "Search settings...",
+    "noSettingsFound": "No settings found",
+    "general": "General",
+    "workflow": "Workflow",
+    "ai": "AI",
+    "providers": "Model Providers",
+    "integrations": "Integrations",
+    "agentPermissions": "Agent Permissions",
+    "toolsMcp": "Tools (MCP)",
+    "experiments": "Experiments",
+    "dangerZone": "Danger Zone"
+  },
   "general": {
     "title": "General Settings",
     "language": "Language",
@@ -33,7 +47,12 @@
     "systemPath": "System PATH:",
     "notFound": "Not found",
     "nodeConfigured": "Node.js is properly configured and ready to use.",
-    "nodeSelectFolder": "Select the folder where Node.js is installed if it's not in your system PATH."
+    "nodeSelectFolder": "Select the folder where Node.js is installed if it's not in your system PATH.",
+    "zoom90Description": "Slightly zoomed out to fit more content on screen.",
+    "zoom100Description": "Default zoom level.",
+    "zoom110Description": "Zoom in a little for easier reading.",
+    "zoom125Description": "Large zoom for improved readability.",
+    "zoom150Description": "Maximum zoom for maximum accessibility."
   },
   "workflow": {
     "title": "Workflow Settings",
@@ -43,7 +62,19 @@
     "autoApprove": "Auto-approve changes",
     "autoApproveDescription": "This will automatically approve code changes and run them.",
     "autoFixProblems": "Auto-fix problems",
-    "autoFixProblemsDescription": "This will automatically fix TypeScript errors."
+    "autoFixProblemsDescription": "This will automatically fix TypeScript errors.",
+    "autoApproveToast": "You can disable auto-approve in the Settings.",
+    "autoFixToast": "You can disable Auto-fix problems in the Settings page.",
+    "autoExpandPreview": "Auto-expand preview",
+    "autoExpandPreviewDescription": "Automatically expand the preview panel when code changes are made.",
+    "keepPreviewsRunning": "Keep previews running",
+    "keepPreviewsRunningDescription": "Note: this may take more memory but allows faster preview loads when switching apps.",
+    "chatEventNotification": "Chat event notifications",
+    "chatEventNotificationDescription": "Show native notifications when a chat response completes or a questionnaire needs your input while the app is not focused.",
+    "agentMode": "Agent",
+    "agentModeDescription": "Better at bigger tasks",
+    "buildMode": "Build",
+    "buildModeDescription": "Generate and edit code"
   },
   "ai": {
     "title": "AI Settings",
@@ -89,7 +120,32 @@
     "apiKeyEmpty": "API Key cannot be empty.",
     "errorTogglingPro": "Error toggling Meowphyr Pro: {{error}}",
     "failedSaveApiKey": "Failed to save API key.",
-    "failedDeleteApiKey": "Failed to delete API key."
+    "failedDeleteApiKey": "Failed to delete API key.",
+    "thinkingBudgetLowLabel": "Low",
+    "thinkingBudgetLowDescription": "Minimal thinking tokens for faster responses and lower costs.",
+    "thinkingBudgetMediumLabel": "Medium (default)",
+    "thinkingBudgetMediumDescription": "Balanced thinking for most conversations.",
+    "thinkingBudgetHighLabel": "High",
+    "thinkingBudgetHighDescription": "Extended thinking for complex problems requiring deep analysis.",
+    "maxChatTurnsEconomyLabel": "Economy (2)",
+    "maxChatTurnsEconomyDescription": "Minimal context to reduce token usage and improve response times.",
+    "maxChatTurnsDefaultLabel": "Default ({{count}})",
+    "maxChatTurnsDefaultDescription": "Balanced context size for most conversations.",
+    "maxChatTurnsPlusLabel": "Plus (5)",
+    "maxChatTurnsPlusDescription": "Slightly higher context size for detailed conversations.",
+    "maxChatTurnsHighLabel": "High (10)",
+    "maxChatTurnsHighDescription": "Extended context for complex conversations requiring more history.",
+    "maxChatTurnsMaxLabel": "Max (100)",
+    "maxChatTurnsMaxDescription": "Maximum context (not recommended due to cost and speed).",
+    "maxToolCallStepsLowLabel": "Low (25)",
+    "maxToolCallStepsLowDescription": "Limits tool calls to 25. Good for simple tasks that don't need many steps.",
+    "maxToolCallStepsMediumLabel": "Medium (50)",
+    "maxToolCallStepsMediumDescription": "Moderate limit for straightforward tasks.",
+    "maxToolCallStepsDefaultLabel": "Default ({{count}})",
+    "maxToolCallStepsDefaultDescription": "Balanced limit for most tasks.",
+    "maxToolCallStepsHighLabel": "High (200)",
+    "maxToolCallStepsHighDescription": "Extended limit for complex multi-step tasks (may increase cost and time).",
+    "contextCompactionDescription": "Automatically compact long conversations to stay within context limits. Original messages are preserved in the app data directory."
   },
   "telemetry": {
     "title": "Telemetry",
@@ -112,6 +168,14 @@
   "agentPermissions": {
     "title": "Agent Permissions (Pro)",
     "description": "Configure permissions for Agent built-in tools.",
+    "subAgentFileAccess": "Sub-Agent File Access",
+    "subAgentFileAccessDescription": "Controls what files sub-agents are allowed to write during multi-agent tasks.",
+    "subAgentReadOnly": "Research only",
+    "subAgentStaging": "Write to staging",
+    "subAgentFull": "Full access",
+    "subAgentReadOnlyHint": "Sub-agents can only read files, search, and report findings — no writes.",
+    "subAgentStagingHint": "Sub-agents can write only to .meowphyr/ staging directory. The leader reviews before applying.",
+    "subAgentFullHint": "Sub-agents can write anywhere. Risk: may deviate from project conventions without system prompt context.",
     "defaultAllowedTools": "Default allowed tools ({{count}})",
     "ask": "Ask",
     "alwaysAllow": "Always allow",
@@ -148,7 +212,11 @@
   "experiments": {
     "title": "Experiments",
     "enableNativeGit": "Enable Native Git",
-    "enableNativeGitDescription": "This doesn't require any external Git installation and offers a faster, native-Git performance experience."
+    "enableNativeGitDescription": "This doesn't require any external Git installation and offers a faster, native-Git performance experience.",
+    "enableMcpServersForBuildMode": "Enable MCP servers for Build mode",
+    "enableMcpServersForBuildModeDescription": "Allow MCP servers to be used when in Build mode. Note: MCP servers are always enabled in Agent mode.",
+    "enableSelectAppFromHomeChatInput": "Enable Select App from Home Chat Input",
+    "enableSelectAppFromHomeChatInputDescription": "Show an app selector in the home chat input to start a chat referencing an existing app."
   },
   "dangerZone": {
     "title": "Danger Zone",

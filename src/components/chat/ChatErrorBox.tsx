@@ -1,4 +1,5 @@
-﻿import { ipc } from "@/ipc/types";
+﻿import { useTranslation } from "react-i18next";
+import { ipc } from "@/ipc/types";
 import { useFreeAgentQuota } from "@/hooks/useFreeAgentQuota";
 import { AI_STREAMING_ERROR_MESSAGE_PREFIX } from "@/shared/texts";
 import {
@@ -24,6 +25,7 @@ export function ChatErrorBox({
   error: string;
   onStartNewChat?: () => void;
 }) {
+  const { t } = useTranslation("chat");
   const { messagesLimit } = useFreeAgentQuota();
 
   if (error.includes("doesn't have a free quota tier")) {
@@ -35,10 +37,10 @@ export function ChatErrorBox({
             href="https://dyad.sh/pro?utm_source=dyad-app&utm_medium=app&utm_campaign=free-quota-error"
             variant="primary"
           >
-            Access with Meowphyr Pro
+            {t("errorBox.accessWithDyadPro")}
           </ExternalLink>
         </span>{" "}
-        or switch to another model.
+        {t("errorBox.orSwitchModel")}
       </ChatErrorContainer>
     );
   }
@@ -53,14 +55,14 @@ export function ChatErrorBox({
     return (
       <ChatInfoContainer onDismiss={onDismiss}>
         <span>
-          Looks like you don't have a valid Meowphyr Pro key.{" "}
+          {t("errorBox.invalidProKey")}{" "}
           <ExternalLink
             href="https://dyad.sh/pro?utm_source=dyad-app&utm_medium=app&utm_campaign=invalid-pro-key-error"
             variant="primary"
           >
-            Upgrade to Meowphyr Pro
+            {t("errorBox.upgradeToDyadPro")}
           </ExternalLink>{" "}
-          today.
+          {t("errorBox.today")}
         </span>
       </ChatInfoContainer>
     );
@@ -69,14 +71,14 @@ export function ChatErrorBox({
     return (
       <ChatInfoContainer onDismiss={onDismiss}>
         <span>
-          You have used all of your Meowphyr AI credits this month.{" "}
+          {t("errorBox.creditsUsed")}{" "}
           <ExternalLink
             href="https://academy.dyad.sh/subscription?utm_source=dyad-app&utm_medium=app&utm_campaign=exceeded-budget-error"
             variant="primary"
           >
-            Reload or upgrade your subscription
+            {t("errorBox.reloadOrUpgrade")}
           </ExternalLink>{" "}
-          and get more AI credits
+          {t("errorBox.getMoreCredits")}
         </span>
       </ChatInfoContainer>
     );
@@ -94,14 +96,13 @@ export function ChatErrorBox({
   if (error.includes("FREE_AGENT_QUOTA_EXCEEDED")) {
     return (
       <ChatErrorContainer onDismiss={onDismiss}>
-        You have used all {messagesLimit} free Agent messages for today. Please
-        upgrade to Meowphyr Pro for unlimited access or switch to Build mode.
+        {t("errorBox.freeAgentQuotaExceeded", { messagesLimit })}
         <div className="mt-2 space-y-2 space-x-2">
           <ExternalLink
             href="https://dyad.sh/pro?utm_source=dyad-app&utm_medium=app&utm_campaign=free-agent-quota-exceeded"
             variant="primary"
           >
-            Upgrade to Meowphyr Pro
+            {t("errorBox.upgradeToDyadPro")}
           </ExternalLink>
         </div>
       </ChatErrorContainer>
@@ -118,16 +119,16 @@ export function ChatErrorBox({
               onClick={onStartNewChat}
               className="cursor-pointer inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium shadow-sm focus:outline-none focus:ring-2 bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500"
             >
-              <span>Start new chat</span>
+              <span>{t("errorBox.startNewChat")}</span>
               <MessageSquarePlus size={18} />
             </TooltipTrigger>
             <TooltipContent>
-              Starting a new chat can fix some issues
+              {t("errorBox.startNewChatTooltip")}
             </TooltipContent>
           </Tooltip>
         )}
         <ExternalLink href="https://www.dyad.sh/docs/faq">
-          Read docs
+          {t("errorBox.readDocs")}
         </ExternalLink>
       </div>
     </ChatErrorContainer>

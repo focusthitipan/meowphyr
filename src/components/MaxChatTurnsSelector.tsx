@@ -10,47 +10,39 @@ import {
 import { MAX_CHAT_TURNS_IN_CONTEXT } from "@/constants/settings_constants";
 import { useTranslation } from "react-i18next";
 
-interface OptionInfo {
-  value: string;
-  label: string;
-  description: string;
-}
-
 const defaultValue = "default";
-
-const options: OptionInfo[] = [
-  {
-    value: "2",
-    label: "Economy (2)",
-    description:
-      "Minimal context to reduce token usage and improve response times.",
-  },
-  {
-    value: defaultValue,
-    label: `Default (${MAX_CHAT_TURNS_IN_CONTEXT})  `,
-    description: "Balanced context size for most conversations.",
-  },
-  {
-    value: "5",
-    label: "Plus (5)",
-    description: "Slightly higher context size for detailed conversations.",
-  },
-  {
-    value: "10",
-    label: "High (10)",
-    description:
-      "Extended context for complex conversations requiring more history.",
-  },
-  {
-    value: "100",
-    label: "Max (100)",
-    description: "Maximum context (not recommended due to cost and speed).",
-  },
-];
 
 export const MaxChatTurnsSelector: React.FC = () => {
   const { settings, updateSettings } = useSettings();
   const { t } = useTranslation("settings");
+
+  const options = [
+    {
+      value: "2",
+      label: t("ai.maxChatTurnsEconomyLabel"),
+      description: t("ai.maxChatTurnsEconomyDescription"),
+    },
+    {
+      value: defaultValue,
+      label: t("ai.maxChatTurnsDefaultLabel", { count: MAX_CHAT_TURNS_IN_CONTEXT }),
+      description: t("ai.maxChatTurnsDefaultDescription"),
+    },
+    {
+      value: "5",
+      label: t("ai.maxChatTurnsPlusLabel"),
+      description: t("ai.maxChatTurnsPlusDescription"),
+    },
+    {
+      value: "10",
+      label: t("ai.maxChatTurnsHighLabel"),
+      description: t("ai.maxChatTurnsHighDescription"),
+    },
+    {
+      value: "100",
+      label: t("ai.maxChatTurnsMaxLabel"),
+      description: t("ai.maxChatTurnsMaxDescription"),
+    },
+  ];
 
   const handleValueChange = (value: string) => {
     if (value === "default") {
@@ -61,11 +53,8 @@ export const MaxChatTurnsSelector: React.FC = () => {
     }
   };
 
-  // Determine the current value
   const currentValue =
     settings?.maxChatTurnsInContext?.toString() || defaultValue;
-
-  // Find the current option to display its description
   const currentOption =
     options.find((opt) => opt.value === currentValue) || options[1];
 

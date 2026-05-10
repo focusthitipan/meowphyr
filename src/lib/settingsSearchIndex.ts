@@ -37,6 +37,7 @@ export const SETTING_IDS = {
   nativeGit: "setting-native-git",
   enableCloudSandbox: "setting-enable-cloud-sandbox",
   blockUnsafeNpmPackages: "setting-block-unsafe-npm-packages",
+  subAgentFileAccess: "setting-sub-agent-file-access",
   enableMcpServersForBuildMode: "setting-enable-mcp-servers-for-build-mode",
   enableSelectAppFromHomeChatInput:
     "setting-enable-select-app-from-home-chat-input",

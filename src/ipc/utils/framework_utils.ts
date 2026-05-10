@@ -68,6 +68,26 @@ function hasNitro(
   return Boolean(deps?.nitro);
 }
 
+export type PackageManager = "pnpm" | "yarn" | "bun" | "npm";
+
+/**
+ * Detect the package manager by checking for lock files.
+ * Falls back to "npm" when none are found.
+ */
+export function detectPackageManager(appPath: string): PackageManager {
+  const lockFiles: Array<[string, PackageManager]> = [
+    ["pnpm-lock.yaml", "pnpm"],
+    ["yarn.lock", "yarn"],
+    ["bun.lockb", "bun"],
+    ["bun.lock", "bun"],
+    ["package-lock.json", "npm"],
+  ];
+  for (const [file, pm] of lockFiles) {
+    if (fs.existsSync(path.join(appPath, file))) return pm;
+  }
+  return "npm";
+}
+
 /**
  * Read the Next.js major version from the app's package.json.
  * Returns null when next is not installed or the version string is non-numeric

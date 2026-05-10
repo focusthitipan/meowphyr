@@ -19,17 +19,17 @@ const ZOOM_LEVEL_LABELS: Record<ZoomLevel, string> = {
   "150": "150%",
 };
 
-const ZOOM_LEVEL_DESCRIPTIONS: Record<ZoomLevel, string> = {
-  "90": "Slightly zoomed out to fit more content on screen.",
-  "100": "Default zoom level.",
-  "110": "Zoom in a little for easier reading.",
-  "125": "Large zoom for improved readability.",
-  "150": "Maximum zoom for maximum accessibility.",
-};
-
 export function ZoomSelector() {
   const { settings, updateSettings } = useSettings();
   const { t } = useTranslation("settings");
+
+  const ZOOM_LEVEL_DESCRIPTIONS: Record<ZoomLevel, string> = {
+    "90": t("general.zoom90Description"),
+    "100": t("general.zoom100Description"),
+    "110": t("general.zoom110Description"),
+    "125": t("general.zoom125Description"),
+    "150": t("general.zoom150Description"),
+  };
   const currentZoomLevel: ZoomLevel = useMemo(() => {
     const value = settings?.zoomLevel ?? DEFAULT_ZOOM_LEVEL;
     return ZoomLevelSchema.safeParse(value).success

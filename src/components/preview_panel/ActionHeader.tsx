@@ -12,6 +12,7 @@ import {
   Wrench,
   Globe,
   Shield,
+  Zap,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useEffect, useRef, useState, useCallback } from "react";
@@ -41,7 +42,8 @@ export type PreviewMode =
   | "problems"
   | "configure"
   | "publish"
-  | "security";
+  | "security"
+  | "skills";
 
 // Preview Header component with preview mode toggle
 export const ActionHeader = () => {
@@ -55,6 +57,7 @@ export const ActionHeader = () => {
   const configureRef = useRef<HTMLButtonElement>(null);
   const publishRef = useRef<HTMLButtonElement>(null);
   const securityRef = useRef<HTMLButtonElement>(null);
+  const skillsRef = useRef<HTMLButtonElement>(null);
   const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   const { problemReport } = useCheckProblems(selectedAppId);
@@ -147,6 +150,9 @@ export const ActionHeader = () => {
           break;
         case "security":
           targetRef = securityRef;
+          break;
+        case "skills":
+          targetRef = skillsRef;
           break;
         default:
           return;
@@ -268,6 +274,13 @@ export const ActionHeader = () => {
           <Globe size={iconSize} />,
           t("preview.publish"),
           "publish-mode-button",
+        )}
+        {renderButton(
+          "skills",
+          skillsRef,
+          <Zap size={iconSize} />,
+          t("preview.skills"),
+          "skills-mode-button",
         )}
       </div>
       <div className="flex items-center gap-1">

@@ -420,10 +420,10 @@ export function registerChatStreamHandlers() {
         logger.error("Failed to inline referenced prompts:", e);
       }
 
-      // Expand /slug skill references (DB prompts + global file skills)
+      // Expand /slug skill references (DB prompts + global file skills + project skills)
       try {
         if (/(?:^|\s)\/[a-zA-Z0-9-]/.test(userPrompt)) {
-          const skillsBySlug = await getAllSkillsBySlug();
+          const skillsBySlug = await getAllSkillsBySlug(getDyadAppPath(chat.app.path));
           const expanded = replaceSlashSkillReference(userPrompt, skillsBySlug);
           if (expanded !== userPrompt) {
             // Set displayUserPrompt with badge tags so the UI shows a badge instead of raw content
@@ -851,7 +851,7 @@ ${componentSnippet}
         // Inject available skills into the system prompt so the AI knows
         // what skills exist and can suggest them when relevant.
         try {
-          const skillsForPrompt = await getAllSkillsForPrompt();
+          const skillsForPrompt = await getAllSkillsForPrompt(appPath);
           const skillsSection = buildSkillsSystemPromptSection(skillsForPrompt);
           if (skillsSection) {
             systemPrompt += "\n\n" + skillsSection;

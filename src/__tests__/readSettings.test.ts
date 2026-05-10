@@ -112,6 +112,7 @@ describe("readSettings", () => {
           },
           "selectedTemplateId": "react",
           "selectedThemeId": "default",
+          "subAgentFileAccess": "read-only",
           "telemetryConsent": "opted_out",
           "telemetryUserId": "[scrubbed]",
         }
@@ -513,6 +514,7 @@ describe("readSettings", () => {
           },
           "selectedTemplateId": "react",
           "selectedThemeId": "default",
+          "subAgentFileAccess": "staging",
           "telemetryConsent": "opted_out",
           "telemetryUserId": "[scrubbed]",
         }

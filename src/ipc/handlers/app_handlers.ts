@@ -124,7 +124,10 @@ import {
   RIPGREP_EXCLUDED_GLOBS,
 } from "../utils/ripgrep_utils";
 import { DyadError, DyadErrorKind } from "@/errors/dyad_error";
-import { detectFrameworkType } from "../utils/framework_utils";
+import {
+  detectFrameworkType,
+  detectPackageManager,
+} from "../utils/framework_utils";
 
 const logger = log.scope("app_handlers");
 const handle = createLoggedHandler(logger);
@@ -213,9 +216,19 @@ function buildSnippetFromMatch({
   };
 }
 
-function getDefaultCommand(appId: number): string {
+function getDefaultCommand(appId: number, appPath: string): string {
   const port = getAppPort(appId);
-  return `(pnpm install && pnpm run dev --port ${port}) || (npm install --legacy-peer-deps && npm run dev -- --port ${port})`;
+  const pm = detectPackageManager(appPath);
+  switch (pm) {
+    case "pnpm":
+      return `pnpm install && pnpm run dev --port ${port}`;
+    case "yarn":
+      return `yarn install && yarn dev --port ${port}`;
+    case "bun":
+      return `bun install && bun run dev --port ${port}`;
+    case "npm":
+      return `npm install --legacy-peer-deps && npm run dev -- --port ${port}`;
+  }
 }
 async function copyDir(
   source: string,
@@ -400,7 +413,7 @@ async function executeAppLocalNode({
   installCommand?: string | null;
   startCommand?: string | null;
 }): Promise<void> {
-  const command = getCommand({ appId, installCommand, startCommand });
+  const command = getCommand({ appId, appPath, installCommand, startCommand });
   const spawnedProcess = spawn(command, [], {
     cwd: appPath,
     shell: true,
@@ -817,7 +830,7 @@ RUN npm install -g pnpm
       `dyad-app-${appId}`,
       "sh",
       "-c",
-      getCommand({ appId, installCommand, startCommand }),
+      getCommand({ appId, appPath, installCommand, startCommand }),
     ],
     {
       stdio: "pipe",
@@ -2865,17 +2878,19 @@ export function registerAppHandlers() {
 
 function getCommand({
   appId,
+  appPath,
   installCommand,
   startCommand,
 }: {
   appId: number;
+  appPath: string;
   installCommand?: string | null;
   startCommand?: string | null;
 }) {
   const hasCustomCommands = !!installCommand?.trim() && !!startCommand?.trim();
   return hasCustomCommands
     ? `${installCommand!.trim()} && ${startCommand!.trim()}`
-    : getDefaultCommand(appId);
+    : getDefaultCommand(appId, appPath);
 }
 
 async function cleanUpPort(port: number) {

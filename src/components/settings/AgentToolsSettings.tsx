@@ -12,14 +12,19 @@ import {
   type AgentToolName,
   type AgentTool,
 } from "@/hooks/useAgentTools";
+import { useSettings } from "@/hooks/useSettings";
 import { Loader2, ChevronRight } from "lucide-react";
 import { AgentToolConsent } from "@/lib/schemas";
 import { useTranslation } from "react-i18next";
+import { Label } from "@/components/ui/label";
 
 export function AgentToolsSettings() {
   const { tools, isLoading, setConsent } = useAgentTools();
+  const { settings, updateSettings } = useSettings();
   const { t } = useTranslation("settings");
   const [showAutoApproved, setShowAutoApproved] = useState(false);
+
+  const subAgentFileAccess = settings?.subAgentFileAccess ?? "staging";
 
   const handleConsentChange = (
     toolName: AgentToolName,
@@ -46,6 +51,51 @@ export function AgentToolsSettings() {
       <p className="text-sm text-muted-foreground">
         {t("agentPermissions.description")}
       </p>
+
+      {/* Sub-agent file access */}
+      <div className="border rounded p-4 space-y-2">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <Label className="text-sm font-medium">
+              {t("agentPermissions.subAgentFileAccess")}
+            </Label>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {t("agentPermissions.subAgentFileAccessDescription")}
+            </p>
+          </div>
+          <Select
+            value={subAgentFileAccess}
+            onValueChange={(v) =>
+              updateSettings({
+                subAgentFileAccess: v as "read-only" | "staging" | "full",
+              })
+            }
+          >
+            <SelectTrigger className="w-[160px] h-8">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="read-only">
+                {t("agentPermissions.subAgentReadOnly")}
+              </SelectItem>
+              <SelectItem value="staging">
+                {t("agentPermissions.subAgentStaging")}
+              </SelectItem>
+              <SelectItem value="full">
+                {t("agentPermissions.subAgentFull")}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <p className="text-xs text-muted-foreground italic">
+          {subAgentFileAccess === "read-only" &&
+            t("agentPermissions.subAgentReadOnlyHint")}
+          {subAgentFileAccess === "staging" &&
+            t("agentPermissions.subAgentStagingHint")}
+          {subAgentFileAccess === "full" &&
+            t("agentPermissions.subAgentFullHint")}
+        </p>
+      </div>
 
       {/* Requires approval tools */}
       <div className="space-y-2">

@@ -308,7 +308,7 @@ export default function HomePage() {
               type="text"
               value={appNameInput}
               onChange={(e) => setAppNameInput(e.target.value)}
-              placeholder="App name (optional — leave blank to auto-generate)"
+              placeholder={t("appNameOptionalPlaceholder")}
               className="w-full mb-2 px-4 py-2 rounded-xl border border-gray-200 bg-white/50 backdrop-blur-sm text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/40 dark:bg-gray-800/50 dark:border-gray-700 dark:text-gray-200 dark:placeholder-gray-500"
             />
           )}
@@ -321,7 +321,7 @@ export default function HomePage() {
                   type="button"
                   key={index}
                   onClick={() =>
-                    setInputValue(t("buildMeA", { label: item.label }))
+                    setInputValue(t("buildMeA", { label: t(item.labelKey as any) }))
                   }
                   className="flex items-center gap-3 px-4 py-2 rounded-xl border border-gray-200
                            bg-white/50 backdrop-blur-sm
@@ -335,7 +335,7 @@ export default function HomePage() {
                     {item.icon}
                   </span>
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    {item.label}
+                    {t(item.labelKey as any)}
                   </span>
                 </button>
               ))}

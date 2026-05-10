@@ -1,0 +1,10 @@
+{
+  "unknown": "เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ",
+  "failedToCreate": "สร้างไม่สำเร็จ: {{error}}",
+  "failedToUpdate": "อัปเดตไม่สำเร็จ: {{error}}",
+  "failedToDelete": "ลบไม่สำเร็จ: {{error}}",
+  "failedToLoad": "โหลดไม่สำเร็จ: {{error}}",
+  "networkError": "เกิดข้อผิดพลาดเครือข่าย กรุณาตรวจสอบการเชื่อมต่อของคุณ",
+  "copyError": "คัดลอกข้อความข้อผิดพลาด",
+  "errorOccurred": "เกิดข้อผิดพลาด"
+}

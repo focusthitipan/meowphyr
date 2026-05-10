@@ -276,6 +276,7 @@ export const LanguageSchema = z.enum([
   "fr",
   "de",
   "pt-BR",
+  "th",
 ]);
 export type Language = z.infer<typeof LanguageSchema>;
 
@@ -357,6 +358,7 @@ const BaseUserSettingsFields = {
   embeddingBatchSize: z.number().optional(),
   embeddingScannerMaxRetries: z.number().optional(),
 
+  subAgentFileAccess: z.enum(["read-only", "staging", "full"]).optional(),
   enableAutoFixProblems: z.boolean().optional(),
   autoExpandPreviewPanel: z.boolean().optional(),
   enableChatEventNotifications: z.boolean().optional(),

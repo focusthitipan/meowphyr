@@ -10,7 +10,8 @@ export const SkillDtoSchema = z.object({
   argumentHint: z.string().nullable(),
   disableModelInvocation: z.boolean(),
   userInvocable: z.boolean(),
-  source: z.enum(["db", "global"]),
+  source: z.enum(["db", "global", "project"]),
+  appName: z.string().nullable().optional(),
 });
 
 export type SkillDto = z.infer<typeof SkillDtoSchema>;

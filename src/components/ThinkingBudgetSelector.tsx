@@ -9,46 +9,35 @@ import {
 } from "@/components/ui/select";
 import { useTranslation } from "react-i18next";
 
-interface OptionInfo {
-  value: string;
-  label: string;
-  description: string;
-}
-
 const defaultValue = "medium";
-
-const options: OptionInfo[] = [
-  {
-    value: "low",
-    label: "Low",
-    description:
-      "Minimal thinking tokens for faster responses and lower costs.",
-  },
-  {
-    value: defaultValue,
-    label: "Medium (default)",
-    description: "Balanced thinking for most conversations.",
-  },
-  {
-    value: "high",
-    label: "High",
-    description:
-      "Extended thinking for complex problems requiring deep analysis.",
-  },
-];
 
 export const ThinkingBudgetSelector: React.FC = () => {
   const { settings, updateSettings } = useSettings();
   const { t } = useTranslation("settings");
 
+  const options = [
+    {
+      value: "low",
+      label: t("ai.thinkingBudgetLowLabel"),
+      description: t("ai.thinkingBudgetLowDescription"),
+    },
+    {
+      value: defaultValue,
+      label: t("ai.thinkingBudgetMediumLabel"),
+      description: t("ai.thinkingBudgetMediumDescription"),
+    },
+    {
+      value: "high",
+      label: t("ai.thinkingBudgetHighLabel"),
+      description: t("ai.thinkingBudgetHighDescription"),
+    },
+  ];
+
   const handleValueChange = (value: string) => {
     updateSettings({ thinkingBudget: value as "low" | "medium" | "high" });
   };
 
-  // Determine the current value
   const currentValue = settings?.thinkingBudget || defaultValue;
-
-  // Find the current option to display its description
   const currentOption =
     options.find((opt) => opt.value === currentValue) || options[1];
 

@@ -22,6 +22,13 @@ import ptBRChat from "./locales/pt-BR/chat.json";
 import ptBRHome from "./locales/pt-BR/home.json";
 import ptBRErrors from "./locales/pt-BR/errors.json";
 
+// Thai
+import thCommon from "./locales/th/common.json";
+import thSettings from "./locales/th/settings.json";
+import thChat from "./locales/th/chat.json";
+import thHome from "./locales/th/home.json";
+import thErrors from "./locales/th/errors.json";
+
 const resources = {
   en: {
     common: enCommon,
@@ -43,6 +50,13 @@ const resources = {
     chat: ptBRChat,
     home: ptBRHome,
     errors: ptBRErrors,
+  },
+  th: {
+    common: thCommon,
+    settings: thSettings,
+    chat: thChat,
+    home: thHome,
+    errors: thErrors,
   },
 };
 

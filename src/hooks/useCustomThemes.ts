@@ -11,6 +11,7 @@ import type {
 import type {
   ThemeGenerateStreamParams,
   ThemeUrlGenerateStreamParams,
+  ThemeProjectGenerateStreamParams,
 } from "@/ipc/types/templates";
 import { queryKeys } from "@/lib/queryKeys";
 
@@ -158,6 +159,59 @@ export function useGenerateThemeFromUrl() {
       setIsPending(true);
 
       ipc.themeUrlGenerateStream.start(
+        { ...params, sessionId },
+        {
+          onChunk: (data) => {
+            if (data.type === "text") {
+              textBufferRef.current += data.delta;
+              setStreamingText(textBufferRef.current);
+              setStatusMessage("");
+            } else {
+              setStatusMessage(data.delta);
+            }
+            callbacks.onChunk?.(data.delta, data.type);
+          },
+          onEnd: () => {
+            setIsPending(false);
+            setStatusMessage("");
+            callbacks.onEnd?.(textBufferRef.current);
+          },
+          onError: (data) => {
+            setIsPending(false);
+            setStatusMessage("");
+            callbacks.onError?.(data.error);
+          },
+        },
+      );
+    },
+    [],
+  );
+
+  return { start, isPending, streamingText, statusMessage };
+}
+
+export function useGenerateThemeFromProject() {
+  const [isPending, setIsPending] = useState(false);
+  const [streamingText, setStreamingText] = useState("");
+  const [statusMessage, setStatusMessage] = useState("");
+  const textBufferRef = useRef("");
+
+  const start = useCallback(
+    (
+      params: Omit<ThemeProjectGenerateStreamParams, "sessionId">,
+      callbacks: {
+        onChunk?: (delta: string, type: "text" | "status") => void;
+        onEnd?: (fullText: string) => void;
+        onError?: (error: string) => void;
+      },
+    ) => {
+      const sessionId = uuidv4();
+      textBufferRef.current = "";
+      setStreamingText("");
+      setStatusMessage("");
+      setIsPending(true);
+
+      ipc.themeProjectGenerateStream.start(
         { ...params, sessionId },
         {
           onChunk: (data) => {

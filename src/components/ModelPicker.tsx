@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { type LargeLanguageModel } from "@/lib/schemas";
 import {
   DropdownMenu,
@@ -23,6 +24,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/queryKeys";
 
 export function ModelPicker() {
+  const { t } = useTranslation("chat");
   const { settings, updateSettings } = useSettings();
   const queryClient = useQueryClient();
   const onModelSelect = (model: LargeLanguageModel) => {
@@ -143,17 +145,17 @@ export function ModelPicker() {
         </span>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-64" align="start">
-        <DropdownMenuLabel>Models</DropdownMenuLabel>
+        <DropdownMenuLabel>{t("modelPicker.models")}</DropdownMenuLabel>
         <DropdownMenuSeparator />
 
         {loading ? (
           <div className="text-xs text-center py-2 text-muted-foreground">
-            Loading models...
+            {t("modelPicker.loadingModels")}
           </div>
         ) : !modelsByProviders ||
           Object.keys(modelsByProviders).length === 0 ? (
           <div className="text-xs text-center py-2 text-muted-foreground">
-            No models available
+            {t("modelPicker.noModelsAvailable")}
           </div>
         ) : (
           <>
@@ -169,18 +171,18 @@ export function ModelPicker() {
                           <span>{providerDisplayName}</span>
                           {provider?.type === "custom" && (
                             <span className="text-[10px] bg-amber-500/20 text-amber-700 px-1.5 py-0.5 rounded-full font-medium">
-                              Custom
+                              {"Custom"}
                             </span>
                           )}
                         </div>
                         <span className="text-xs text-muted-foreground">
-                          {models.length} models
+                          {t("modelPicker.modelCount", { count: models.length })}
                         </span>
                       </div>
                     </DropdownMenuSubTrigger>
                     <DropdownMenuSubContent className="w-56 max-h-100 overflow-y-auto">
                       <DropdownMenuLabel>
-                        {providerDisplayName + " Models"}
+                        {t("modelPicker.providerModels", { name: providerDisplayName })}
                       </DropdownMenuLabel>
                       <DropdownMenuSeparator />
                       {models.map((model) => (
@@ -225,14 +227,14 @@ export function ModelPicker() {
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger className="w-full font-normal">
                     <div className="flex flex-col items-start">
-                      <span>Other AI providers</span>
+                      <span>{t("modelPicker.otherProviders")}</span>
                       <span className="text-xs text-muted-foreground">
-                        {secondaryProviders.length} providers
+                        {t("modelPicker.providerCount", { count: secondaryProviders.length })}
                       </span>
                     </div>
                   </DropdownMenuSubTrigger>
                   <DropdownMenuSubContent className="w-56">
-                    <DropdownMenuLabel>Other AI providers</DropdownMenuLabel>
+                    <DropdownMenuLabel>{t("modelPicker.otherProviders")}</DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     {secondaryProviders.map(([providerId, models]) => {
                       const provider = providers?.find(
@@ -246,18 +248,18 @@ export function ModelPicker() {
                                 <span>{provider?.name ?? providerId}</span>
                                 {provider?.type === "custom" && (
                                   <span className="text-[10px] bg-amber-500/20 text-amber-700 px-1.5 py-0.5 rounded-full font-medium">
-                                    Custom
+                                    {"Custom"}
                                   </span>
                                 )}
                               </div>
                               <span className="text-xs text-muted-foreground">
-                                {models.length} models
+                                {t("modelPicker.modelCount", { count: models.length })}
                               </span>
                             </div>
                           </DropdownMenuSubTrigger>
                           <DropdownMenuSubContent className="w-56">
                             <DropdownMenuLabel>
-                              {(provider?.name ?? providerId) + " Models"}
+                              {t("modelPicker.providerModels", { name: provider?.name ?? providerId })}
                             </DropdownMenuLabel>
                             <DropdownMenuSeparator />
                             {models.map((model) => (
@@ -309,9 +311,9 @@ export function ModelPicker() {
             <DropdownMenuSub>
               <DropdownMenuSubTrigger className="w-full font-normal">
                 <div className="flex flex-col items-start">
-                  <span>Local models</span>
+                  <span>{t("modelPicker.localModels")}</span>
                   <span className="text-xs text-muted-foreground">
-                    LM Studio, Ollama
+                    {t("modelPicker.localModelsDescription")}
                   </span>
                 </div>
               </DropdownMenuSubTrigger>
@@ -323,49 +325,49 @@ export function ModelPicker() {
                     className="w-full font-normal"
                   >
                     <div className="flex flex-col items-start">
-                      <span>Ollama</span>
+                      <span>{t("modelPicker.ollama")}</span>
                       {ollamaLoading ? (
                         <span className="text-xs text-muted-foreground">
-                          Loading...
+                          {t("modelPicker.loadingModels")}
                         </span>
                       ) : ollamaError ? (
                         <span className="text-xs text-red-500">
-                          Error loading
+                          {t("modelPicker.errorLoading")}
                         </span>
                       ) : !hasOllamaModels ? (
                         <span className="text-xs text-muted-foreground">
-                          None available
+                          {t("modelPicker.noneAvailable")}
                         </span>
                       ) : (
                         <span className="text-xs text-muted-foreground">
-                          {ollamaModels.length} models
+                          {t("modelPicker.modelCount_other", { count: ollamaModels.length })}
                         </span>
                       )}
                     </div>
                   </DropdownMenuSubTrigger>
                   <DropdownMenuSubContent className="w-56 max-h-100 overflow-y-auto">
-                    <DropdownMenuLabel>Ollama Models</DropdownMenuLabel>
+                    <DropdownMenuLabel>{t("modelPicker.ollamaModels")}</DropdownMenuLabel>
                     <DropdownMenuSeparator />
 
                     {ollamaLoading && ollamaModels.length === 0 ? ( // Show loading only if no models are loaded yet
                       <div className="text-xs text-center py-2 text-muted-foreground">
-                        Loading models...
+                        {t("modelPicker.loadingModels")}
                       </div>
                     ) : ollamaError ? (
                       <div className="px-2 py-1.5 text-sm text-red-600">
                         <div className="flex flex-col">
-                          <span>Error loading models</span>
+                          <span>{t("modelPicker.errorLoading")}</span>
                           <span className="text-xs text-muted-foreground">
-                            Is Ollama running?
+                            {t("modelPicker.isOllamaRunning")}
                           </span>
                         </div>
                       </div>
                     ) : !hasOllamaModels ? (
                       <div className="px-2 py-1.5 text-sm">
                         <div className="flex flex-col">
-                          <span>No local models found</span>
+                          <span>{t("modelPicker.noLocalModels")}</span>
                           <span className="text-xs text-muted-foreground">
-                            Ensure Ollama is running and models are pulled.
+                            {t("modelPicker.ensureOllamaRunning")}
                           </span>
                         </div>
                       </div>
@@ -406,38 +408,38 @@ export function ModelPicker() {
                     className="w-full font-normal"
                   >
                     <div className="flex flex-col items-start">
-                      <span>LM Studio</span>
+                      <span>{t("modelPicker.lmStudio")}</span>
                       {lmStudioLoading ? (
                         <span className="text-xs text-muted-foreground">
-                          Loading...
+                          {t("modelPicker.loadingModels")}
                         </span>
                       ) : lmStudioError ? (
                         <span className="text-xs text-red-500">
-                          Error loading
+                          {t("modelPicker.errorLoading")}
                         </span>
                       ) : !hasLMStudioModels ? (
                         <span className="text-xs text-muted-foreground">
-                          None available
+                          {t("modelPicker.noneAvailable")}
                         </span>
                       ) : (
                         <span className="text-xs text-muted-foreground">
-                          {lmStudioModels.length} models
+                          {t("modelPicker.modelCount_other", { count: lmStudioModels.length })}
                         </span>
                       )}
                     </div>
                   </DropdownMenuSubTrigger>
                   <DropdownMenuSubContent className="w-56 max-h-100 overflow-y-auto">
-                    <DropdownMenuLabel>LM Studio Models</DropdownMenuLabel>
+                    <DropdownMenuLabel>{t("modelPicker.lmStudioModels")}</DropdownMenuLabel>
                     <DropdownMenuSeparator />
 
                     {lmStudioLoading && lmStudioModels.length === 0 ? ( // Show loading only if no models are loaded yet
                       <div className="text-xs text-center py-2 text-muted-foreground">
-                        Loading models...
+                        {t("modelPicker.loadingModels")}
                       </div>
                     ) : lmStudioError ? (
                       <div className="px-2 py-1.5 text-sm text-red-600">
                         <div className="flex flex-col">
-                          <span>Error loading models</span>
+                          <span>{t("modelPicker.errorLoading")}</span>
                           <span className="text-xs text-muted-foreground">
                             {lmStudioError.message}{" "}
                             {/* Display specific error */}
@@ -447,9 +449,9 @@ export function ModelPicker() {
                     ) : !hasLMStudioModels ? (
                       <div className="px-2 py-1.5 text-sm">
                         <div className="flex flex-col">
-                          <span>No loaded models found</span>
+                          <span>{t("modelPicker.noLoadedModels")}</span>
                           <span className="text-xs text-muted-foreground">
-                            Ensure LM Studio is running and models are loaded.
+                            {t("modelPicker.ensureLMStudioRunning")}
                           </span>
                         </div>
                       </div>

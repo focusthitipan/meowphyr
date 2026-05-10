@@ -35,9 +35,9 @@ export function DefaultChatModeSelector() {
   const getModeDisplayName = (mode: ChatMode) => {
     switch (mode) {
       case "build":
-        return "Build";
+        return t("workflow.buildMode");
       case "local-agent":
-        return "Agent";
+        return t("workflow.agentMode");
       case "ask":
         return "Ask";
       case "plan":
@@ -66,17 +66,17 @@ export function DefaultChatModeSelector() {
           <SelectContent>
             <SelectItem value="local-agent">
               <div className="flex flex-col items-start">
-                <span className="font-medium">Agent</span>
+                <span className="font-medium">{t("workflow.agentMode")}</span>
                 <span className="text-xs text-muted-foreground">
-                  Better at bigger tasks
+                  {t("workflow.agentModeDescription")}
                 </span>
               </div>
             </SelectItem>
             <SelectItem value="build">
               <div className="flex flex-col items-start">
-                <span className="font-medium">Build</span>
+                <span className="font-medium">{t("workflow.buildMode")}</span>
                 <span className="text-xs text-muted-foreground">
-                  Generate and edit code
+                  {t("workflow.buildModeDescription")}
                 </span>
               </div>
             </SelectItem>

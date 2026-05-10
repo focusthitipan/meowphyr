@@ -148,8 +148,26 @@
     "buildWithMcp": "Build with MCP",
     "buildWithMcpDescription": "Like Build, but can use tools (MCP) to generate code"
   },
+  "loadingMessages": [
+    "Preparing your conversation... 🗨️",
+    "Gathering thoughts... 💭",
+    "Crafting the perfect response... 🎨",
+    "Almost there... 🚀",
+    "Just a moment... ⏳",
+    "Warming up the neural networks... 🧠",
+    "Connecting the dots... 🔗",
+    "Brewing some digital magic... ✨",
+    "Assembling words with care... 🔤",
+    "Fine-tuning the response... 🎯",
+    "Diving into deep thought... 🤿",
+    "Weaving ideas together... 🕸️",
+    "Sparking up the conversation... ⚡",
+    "Polishing the perfect reply... 💎"
+  ],
   "modelPicker": {
     "modelLabel": "Model:",
+    "models": "Models",
+    "noModelsAvailable": "No models available",
     "cloudModels": "Cloud Models",
     "loadingModels": "Loading models...",
     "noCloudModels": "No cloud models available",
@@ -190,6 +208,9 @@
     "versionCount": "Version {{count}}"
   },
   "errorBox": {
+    "startNewChat": "Start new chat",
+    "startNewChatTooltip": "Starting a new chat can fix some issues",
+    "freeAgentQuotaExceeded": "You have used all {{messagesLimit}} free Agent messages for today. Please upgrade to Meowphyr Pro for unlimited access or switch to Build mode.",
     "accessWithDyadPro": "Access with Meowphyr Pro",
     "orSwitchModel": "or switch to another model.",
     "upgradeToDyadPro": "Upgrade to Meowphyr Pro",

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -33,6 +34,7 @@ export function EditThemeDialog({
   onUpdateTheme,
   trigger,
 }: EditThemeDialogProps) {
+  const { t } = useTranslation("home");
   const [open, setOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [draft, setDraft] = useState({
@@ -93,11 +95,13 @@ export function EditThemeDialog({
         description: draft.description.trim() || undefined,
         prompt: draft.prompt.trim(),
       });
-      toast.success("Theme updated successfully");
+      toast.success(t("editTheme.themeUpdated"));
       setOpen(false);
     } catch (error) {
       showError(
-        `Failed to update theme: ${error instanceof Error ? error.message : "Unknown error"}`,
+        t("editTheme.failedUpdateTheme", {
+          error: error instanceof Error ? error.message : "Unknown error",
+        }),
       );
     } finally {
       setIsSaving(false);
@@ -128,19 +132,19 @@ export function EditThemeDialog({
       )}
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Edit Theme</DialogTitle>
+          <DialogTitle>{t("editTheme.title")}</DialogTitle>
           <DialogDescription>
-            Modify your custom theme settings and prompt.
+            {t("editTheme.description")}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 mt-4">
           <div className="space-y-2">
             <label htmlFor="edit-theme-name" className="text-sm font-medium">
-              Theme Name
+              {t("editTheme.themeName")}
             </label>
             <Input
               id="edit-theme-name"
-              placeholder="Theme name"
+              placeholder={t("editTheme.themeNamePlaceholder")}
               value={draft.name}
               onChange={(e) =>
                 setDraft((d) => ({ ...d, name: e.target.value }))
@@ -152,11 +156,11 @@ export function EditThemeDialog({
               htmlFor="edit-theme-description"
               className="text-sm font-medium"
             >
-              Description (optional)
+              {t("editTheme.descriptionOptional")}
             </label>
             <Input
               id="edit-theme-description"
-              placeholder="A brief description of your theme"
+              placeholder={t("editTheme.descriptionPlaceholder")}
               value={draft.description}
               onChange={(e) =>
                 setDraft((d) => ({ ...d, description: e.target.value }))
@@ -165,12 +169,12 @@ export function EditThemeDialog({
           </div>
           <div className="space-y-2">
             <label htmlFor="edit-theme-prompt" className="text-sm font-medium">
-              Theme Prompt
+              {t("editTheme.themePrompt")}
             </label>
             <Textarea
               id="edit-theme-prompt"
               ref={textareaRef}
-              placeholder="Enter your theme system prompt..."
+              placeholder={t("editTheme.themePromptPlaceholder")}
               value={draft.prompt}
               onChange={(e) => {
                 setDraft((d) => ({ ...d, prompt: e.target.value }));
@@ -183,7 +187,7 @@ export function EditThemeDialog({
         </div>
         <DialogFooter className="mt-4">
           <Button variant="outline" onClick={handleCancel} disabled={isSaving}>
-            Cancel
+            {t("appDetails.cancel")}
           </Button>
           <Button
             onClick={handleSave}
@@ -192,11 +196,11 @@ export function EditThemeDialog({
             {isSaving ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Saving...
+                {t("customTheme.saveTheme")}
               </>
             ) : (
               <>
-                <Save className="mr-2 h-4 w-4" /> Save
+                <Save className="mr-2 h-4 w-4" /> {t("customTheme.saveTheme")}
               </>
             )}
           </Button>

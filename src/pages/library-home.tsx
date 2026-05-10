@@ -6,6 +6,7 @@ import { useAppMediaFiles } from "@/hooks/useAppMediaFiles";
 import { useLoadApps } from "@/hooks/useLoadApps";
 import { useAddPromptDeepLink } from "@/hooks/useAddPromptDeepLink";
 import { BookOpen, Loader2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { CreateOrEditPromptDialog } from "@/components/CreatePromptDialog";
 import { CreateOrEditSkillDialog } from "@/components/CreateOrEditSkillDialog";
 import { CustomThemeDialog } from "@/components/CustomThemeDialog";
@@ -24,6 +25,7 @@ import { filterMediaAppsByQuery } from "@/lib/mediaUtils";
 // ---------------------------------------------------------------------------
 
 export default function LibraryHomePage() {
+  const { t } = useTranslation("home");
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterType>(() => {
     const params = new URLSearchParams(window.location.search);
@@ -151,7 +153,7 @@ export default function LibraryHomePage() {
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-3xl font-bold">
               <BookOpen className="inline-block h-8 w-8 mr-2" />
-              Library
+              {t("library.title")}
             </h1>
             <NewLibraryItemMenu
                 onNewPrompt={() => setPromptDialogOpen(true)}
@@ -190,16 +192,16 @@ export default function LibraryHomePage() {
           ) : hasNoResults ? (
             <div className="text-muted-foreground text-center py-12">
               {searchQuery
-                ? "No results found."
+                ? t("library.noResults")
                 : activeFilter === "media"
-                  ? "No media files yet."
+                  ? t("library.noMedia")
                   : activeFilter === "themes"
-                    ? "No themes yet."
+                    ? t("library.noThemes")
                     : activeFilter === "prompts"
-                    ? "No prompts yet."
+                    ? t("library.noPrompts")
                     : activeFilter === "skills"
-                      ? "No skills yet. Create one with the New button or add SKILL.md files to the skills folder."
-                      : "No items in your library yet."}
+                      ? t("library.noSkills")
+                      : t("library.noItems")}
             </div>
           ) : (
             <div

@@ -106,21 +106,34 @@ export const updateTodosTool: ToolDefinition<
   modifiesState: true,
 
   getConsentPreview: (args) => {
+    if (args.merge) {
+      return `Updating ${args.todos.length} todo(s)`;
+    }
     const count = args.todos.length;
     const completed = args.todos.filter((t) => t.status === "completed").length;
-    return `${completed}/${count} todos completed`;
+    const pending = args.todos.filter((t) => t.status === "pending").length;
+    return `${completed} done, ${pending} pending (${count} total)`;
   },
 
   buildXml: (args, isComplete) => {
-    if (!isComplete) return undefined;
     const todos = args.todos ?? [];
-    const inProgress = todos.filter((t) => t.status === "in_progress").length;
-    const pending = todos.filter((t) => t.status === "pending").length;
-    const completed = todos.filter((t) => t.status === "completed").length;
-    const label = args.merge
-      ? `📋 Todos: ${inProgress} active, ${pending} pending, ${completed} done`
-      : `📋 Todos (${todos.length} items)`;
-    return `<dyad-status title="${escapeXmlAttr(label)}" state="finished"></dyad-status>`;
+    if (!isComplete) {
+      const count = todos.length;
+      const label = count > 0 ? `Updating ${count} todo(s)...` : "Updating todos...";
+      return `<dyad-status title="${escapeXmlAttr("📋 " + label)}" state="in-progress"></dyad-status>`;
+    }
+    // When merge=true, args.todos is only the delta (changed items), not the full list.
+    // Show counts only when we have the full list (merge=false).
+    let label: string;
+    if (args.merge) {
+      label = `Updated ${todos.length} todo(s)`;
+    } else {
+      const inProgress = todos.filter((t) => t.status === "in_progress").length;
+      const pending = todos.filter((t) => t.status === "pending").length;
+      const completed = todos.filter((t) => t.status === "completed").length;
+      label = `Todos: ${inProgress} active, ${pending} pending, ${completed} done`;
+    }
+    return `<dyad-status title="${escapeXmlAttr("📋 " + label)}" state="finished"></dyad-status>`;
   },
 
   execute: async (args, ctx: AgentContext) => {

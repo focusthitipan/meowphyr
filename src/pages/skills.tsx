@@ -4,13 +4,16 @@ import { LibraryCard } from "@/components/LibraryCard";
 import { CreateOrEditSkillDialog } from "@/components/CreateOrEditSkillDialog";
 import { Button } from "@/components/ui/button";
 import { Plus, Zap } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export default function SkillsPage() {
+  const { t } = useTranslation("home");
+  const { t: tCommon } = useTranslation();
   const { skills, isLoading, createSkill, updateSkill, deleteSkill } =
     useSkills();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
-  const globalSkills = skills.filter((s) => s.source === "global");
+  const globalSkills = skills.filter((s) => s.source === "global" || s.source === "db");
 
   return (
     <div className="w-full px-4 py-6 sm:px-6 lg:px-8">
@@ -18,22 +21,21 @@ export default function SkillsPage() {
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="flex items-center text-2xl font-bold sm:text-3xl">
             <Zap className="mr-2 h-7 w-7 sm:h-8 sm:w-8" />
-            Skills
+            {t("library.filterSkills")}
           </h1>
           <Button
             className="w-full sm:w-auto"
             onClick={() => setCreateDialogOpen(true)}
           >
-            <Plus className="mr-2 h-4 w-4" /> New Skill
+            <Plus className="mr-2 h-4 w-4" /> {t("library.newSkill")}
           </Button>
         </div>
 
         {isLoading ? (
-          <div>Loading...</div>
+          <div>{tCommon("loading")}</div>
         ) : globalSkills.length === 0 ? (
           <div className="text-muted-foreground">
-            No skills yet. Create one or add SKILL.md files to the skills
-            folder.
+            {t("library.noSkills")}
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">

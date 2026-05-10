@@ -1,5 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { PlusCircle, Search } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useAtom } from "jotai";
 import { selectedAppIdAtom } from "@/atoms/appAtoms";
 import {
@@ -21,6 +22,7 @@ import { showError, showSuccess } from "@/lib/toast";
 import type { ListedApp } from "@/ipc/types/app";
 
 export function AppList({ show }: { show?: boolean }) {
+  const { t } = useTranslation("home");
   const navigate = useNavigate();
   const [selectedAppId, setSelectedAppId] = useAtom(selectedAppIdAtom);
   const openApp = useOpenApp();
@@ -108,7 +110,7 @@ export function AppList({ show }: { show?: boolean }) {
         className="overflow-y-auto h-[calc(100vh-112px)]"
         data-testid="app-list-container"
       >
-        <SidebarGroupLabel>Your Apps</SidebarGroupLabel>
+        <SidebarGroupLabel>{t("appList.yourApps")}</SidebarGroupLabel>
         <SidebarGroupContent>
           <div className="flex flex-col space-y-2">
             <Button
@@ -117,7 +119,7 @@ export function AppList({ show }: { show?: boolean }) {
               className="flex items-center justify-start gap-2 mx-2 py-2"
             >
               <PlusCircle size={16} />
-              <span>New App</span>
+              <span>{t("appList.newApp")}</span>
             </Button>
             <Button
               onClick={() => setIsSearchDialogOpen(!isSearchDialogOpen)}
@@ -126,27 +128,27 @@ export function AppList({ show }: { show?: boolean }) {
               data-testid="search-apps-button"
             >
               <Search size={16} />
-              <span>Search Apps</span>
+              <span>{t("appList.searchApps")}</span>
             </Button>
 
             {loading ? (
               <div className="py-2 px-4 text-sm text-gray-500">
-                Loading apps...
+                {t("appList.loadingApps")}
               </div>
             ) : error ? (
               <div className="py-2 px-4 text-sm text-red-500">
-                Error loading apps
+                {t("appList.errorLoadingApps")}
               </div>
             ) : apps.length === 0 ? (
               <div className="py-2 px-4 text-sm text-gray-500">
-                No apps found
+                {t("appList.noAppsFound")}
               </div>
             ) : (
               <SidebarMenu className="space-y-1" data-testid="app-list">
-                <SidebarGroupLabel>Favorite apps</SidebarGroupLabel>
+                <SidebarGroupLabel>{t("appList.favoriteApps")}</SidebarGroupLabel>
                 {favoriteApps.length === 0 ? (
                   <div className="px-4 text-xs text-gray-500 italic">
-                    Star an app from its details page to pin it here
+                    {t("appList.starAppHint")}
                   </div>
                 ) : (
                   favoriteApps.map((app) => (
@@ -160,7 +162,7 @@ export function AppList({ show }: { show?: boolean }) {
                     />
                   ))
                 )}
-                <SidebarGroupLabel>Other apps</SidebarGroupLabel>
+                <SidebarGroupLabel>{t("appList.otherApps")}</SidebarGroupLabel>
                 {nonFavoriteApps.map((app) => (
                   <AppItem
                     key={app.id}

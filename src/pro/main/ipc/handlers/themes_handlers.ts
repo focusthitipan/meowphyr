@@ -3,15 +3,22 @@ import { createTypedHandler } from "../../../../ipc/handlers/base";
 import { templateContracts } from "@/ipc/types/templates";
 import { safeSend } from "../../../../ipc/utils/safe_sender";
 import log from "electron-log";
+import crypto from "crypto";
 import path from "path";
 import os from "os";
 import fs from "fs";
 import { readFile, writeFile, unlink, mkdir } from "fs/promises";
+import { readFileTool } from "./local_agent/tools/read_file";
+import { listFilesTool } from "./local_agent/tools/list_files";
+import { grepTool } from "./local_agent/tools/grep";
+import { globTool } from "./local_agent/tools/glob_tool";
+import type { AgentContext } from "./local_agent/tools/types";
+import type { IpcMainInvokeEvent } from "electron";
 import { themesData, type Theme } from "../../../../shared/themes";
 import { db } from "../../../../db";
 import { apps, customThemes } from "../../../../db/schema";
 import { eq, sql } from "drizzle-orm";
-import { streamText, TextPart, ImagePart } from "ai";
+import { streamText, TextPart, ImagePart, stepCountIs } from "ai";
 import { readSettings } from "../../../../main/settings";
 import { IS_TEST_BUILD } from "@/ipc/utils/test_utils";
 import { getModelClient } from "../../../../ipc/utils/get_model_client";
@@ -36,7 +43,7 @@ import {
   getLanguageModels,
 } from "@/ipc/shared/language_model_helpers";
 import { DyadError, DyadErrorKind } from "@/errors/dyad_error";
-import { BrowserWindow } from "electron";
+import { BrowserWindow, dialog } from "electron";
 import {
   type UserSettings,
   type AzureProviderSetting,
@@ -185,13 +192,13 @@ FIXED TECH STACK
   - All styling must be token-driven
 
 OUTPUT RULES
-- Wrap the entire output in <theme></theme> tags.
-- Output exactly ONE SYSTEM PROMPT that:
-  - Names the inspiration strictly as a stylistic reference, not a target
-  - Defines enforceable rules, never descriptions
-  - Uses imperative language only ("must", "never", "always")
-  - Never mentions images, screenshots, or visual analysis
-  - Produces a system that cannot recreate the original UI even if followed precisely
+- Wrap the entire theme system prompt in <theme> and </theme> tags. You may write brief reasoning before the opening tag, but nothing after the closing tag.
+- The theme system prompt must:
+  - Name the inspiration strictly as a stylistic reference, not a target
+  - Define enforceable rules, never descriptions
+  - Use imperative language only ("must", "never", "always")
+  - Never mention images, screenshots, or visual analysis
+  - Produce a system that cannot recreate the original UI even if followed precisely
 
 REQUIRED STRUCTURE
 - Visual Objective (abstract, non-descriptive)
@@ -222,13 +229,13 @@ FIXED TECH STACK
   - No arbitrary values outside defined scales
 
 OUTPUT RULES
-- Wrap the entire output in <theme></theme> tags.
-- Output one SYSTEM PROMPT that:
-  - Explicitly names the inspiration as a guiding reference
-  - Uses hard, enforceable rules only
-  - Is technical and unambiguous
-  - Never mentions the image 
-  - Avoids vague language ("might", "appears", etc.)
+- Wrap the entire theme system prompt in <theme> and </theme> tags. You may write brief reasoning before the opening tag, but nothing after the closing tag.
+- The theme system prompt must:
+  - Explicitly name the inspiration as a guiding reference
+  - Use hard, enforceable rules only
+  - Be technical and unambiguous
+  - Never mention the image
+  - Avoid vague language ("might", "appears", etc.)
 
 REQUIRED STRUCTURE
 - Visual Objective
@@ -244,15 +251,16 @@ REQUIRED STRUCTURE
 // Web crawl "inspired" mode prompt - separate from image-based prompt
 const WEB_CRAWL_THEME_GENERATION_META_PROMPT = `PURPOSE
 - Generate a strict SYSTEM PROMPT that extracts a reusable UI DESIGN SYSTEM from a crawled website.
-- You are provided with a screenshot image and markdown representation of a live website.
+- You are provided with screenshots, HTML structure, and CSS custom properties of a live website.
 - This is a visual ruleset, not a website blueprint.
-- Extract constraints, scales, and principles from the visual appearance.
+- Extract constraints, scales, and principles from the visual appearance and design tokens.
 - You are NOT recreating, cloning, or reverse-engineering the specific website.
 - The resulting system must be applicable to unrelated products without visual resemblance.
 
 INPUTS
-- Screenshot image of the website (PRIMARY reference for visual style)
-- Markdown text content (for understanding structure and hierarchy)
+- Screenshot image(s) of the website (PRIMARY reference for visual style)
+- HTML structure / outerHTML (for component hierarchy and semantic patterns — secondary)
+- CSS custom properties from :root (extracted design tokens: colors, spacing, radii, typography — use directly when available)
 - Optional keywords for style guidance
 
 SCOPE & LIMITATIONS (MANDATORY)
@@ -274,13 +282,13 @@ FIXED TECH STACK
   - All styling must be token-driven
 
 OUTPUT RULES
-- Wrap the entire output in <theme></theme> tags.
-- Output exactly ONE SYSTEM PROMPT that:
-  - Names any inspiration strictly as a stylistic reference, not a target
-  - Defines enforceable rules, never descriptions
-  - Uses imperative language only ("must", "never", "always")
-  - Never mentions the screenshot, URL, or crawled content
-  - Produces a system that cannot recreate the original UI even if followed precisely
+- Wrap the entire theme system prompt in <theme> and </theme> tags. You may write brief reasoning before the opening tag, but nothing after the closing tag.
+- The theme system prompt must:
+  - Name any inspiration strictly as a stylistic reference, not a target
+  - Define enforceable rules, never descriptions
+  - Use imperative language only ("must", "never", "always")
+  - Never mention the screenshot, URL, or crawled content
+  - Produce a system that cannot recreate the original UI even if followed precisely
 
 REQUIRED STRUCTURE
 - Visual Objective (abstract, non-descriptive)
@@ -296,15 +304,16 @@ REQUIRED STRUCTURE
 // Web crawl "high-fidelity" mode prompt - separate from image-based prompt
 const WEB_CRAWL_HIGH_FIDELITY_META_PROMPT = `PURPOSE
 - Generate a strict SYSTEM PROMPT that allows an AI to recreate a UI visual system from a crawled website.
-- You are provided with a screenshot image and markdown representation of a live website.
+- You are provided with screenshots, HTML structure, and CSS custom properties of a live website.
 - This is a visual subsystem. Do not define roles or personas.
 - Extract rules, not descriptions. Use the screenshot as primary visual reference.
 
 INPUTS
-- Screenshot image of the website (PRIMARY reference - use for visual accuracy)
-- Markdown text content (supplementary - for text hierarchy)
+- Screenshot image(s) of the website (PRIMARY reference — use for visual accuracy)
+- HTML structure / outerHTML (secondary — component patterns and semantic structure)
+- CSS custom properties from :root (extracted design tokens — use directly as token values when present)
 - Optional reference name for the design inspiration
-- Screenshot always takes priority over markdown.
+- Screenshots always take priority; CSS vars provide ground-truth token values.
 
 FIXED TECH STACK
 - Assume React + Tailwind CSS + shadcn/ui.
@@ -314,13 +323,13 @@ FIXED TECH STACK
   - No arbitrary values outside defined scales
 
 OUTPUT RULES
-- Wrap the entire output in <theme></theme> tags.
-- Output one SYSTEM PROMPT that:
-  - Explicitly names the inspiration as a guiding reference
-  - Uses hard, enforceable rules only
-  - Is technical and unambiguous
-  - Never mentions the screenshot or crawled URL
-  - Avoids vague language ("might", "appears", etc.)
+- Wrap the entire theme system prompt in <theme> and </theme> tags. You may write brief reasoning before the opening tag, but nothing after the closing tag.
+- The theme system prompt must:
+  - Explicitly name the inspiration as a guiding reference
+  - Use hard, enforceable rules only
+  - Be technical and unambiguous
+  - Never mention the screenshot or crawled URL
+  - Avoid vague language ("might", "appears", etc.)
 
 REQUIRED STRUCTURE
 - Visual Objective
@@ -333,13 +342,158 @@ REQUIRED STRUCTURE
 - Self-Check
 `;
 
+// Project exploration system prompts — AI uses tools to explore then generates theme
+const PROJECT_THEME_GENERATION_META_PROMPT = `PURPOSE
+- You are a UI design analyst with access to file exploration tools.
+- Use the tools to explore the project codebase and extract a reusable UI DESIGN SYSTEM.
+- Then generate a strict SYSTEM PROMPT encoding that design system.
+- This is a visual ruleset — not a code blueprint.
+
+EXPLORATION STRATEGY
+1. Call list_files to see the root project structure
+2. Prioritize reading these files (use glob or list_files to find them):
+   - tailwind.config.ts / tailwind.config.js (most important — authoritative design tokens)
+   - components.json (shadcn/ui config)
+   - globals.css, index.css, app.css, or any root CSS file
+   - src/styles/**/*.css or similar style directories
+3. Use grep to find CSS custom properties: search for "--" patterns in CSS files
+4. Optionally sample a few component files to observe className usage patterns
+5. Stop exploring when you have enough design token data — do not read every file
+
+OUTPUT RULES
+- Wrap the entire theme system prompt in <theme> and </theme> tags. You may write brief reasoning before the opening tag, but nothing after the closing tag.
+- The theme system prompt must:
+  - Name the codebase style strictly as a stylistic reference, not a target
+  - Define enforceable rules only — never descriptions
+  - Use imperative language ("must", "never", "always")
+  - Never reference file paths, component names, or the original project
+  - Produce a transferable system that cannot recreate the original project
+
+REQUIRED STRUCTURE
+- Visual Objective (abstract, non-descriptive)
+- Layout & Spacing Rules (scales only, no patterns)
+- Typography System (roles, hierarchy, constraints)
+- Color & Surfaces (tokens, elevation logic)
+- Components & Shape Language (geometry, affordances — no layouts)
+- Motion & Interaction (timing, intent, limits)
+- Forbidden Patterns (explicit anti-cloning rules)
+- Self-Check (verifies abstraction & non-replication)
+
+FIXED TECH STACK
+- Assume React + Tailwind CSS + shadcn/ui.
+- Hard Rules: never ship default shadcn styles, no inline styles, no arbitrary values.
+`;
+
+const PROJECT_HIGH_FIDELITY_META_PROMPT = `PURPOSE
+- You are a UI design analyst with access to file exploration tools.
+- Use the tools to explore the project codebase and extract its UI visual system.
+- Then generate a strict SYSTEM PROMPT that allows an AI to recreate that visual system.
+- Extract rules, not descriptions. Config files provide ground-truth token values.
+
+EXPLORATION STRATEGY
+1. Call list_files to see the root project structure
+2. Prioritize reading these files:
+   - tailwind.config.ts / tailwind.config.js (PRIMARY — authoritative design tokens)
+   - components.json (shadcn/ui config)
+   - globals.css, index.css, app.css, or any root CSS file
+   - src/styles/**/*.css or similar style directories
+3. Use grep to find CSS custom properties (search for "--" patterns)
+4. Sample component files to see how tokens are applied
+5. Stop exploring when you have sufficient token data
+
+OUTPUT RULES
+- Wrap the entire theme system prompt in <theme> and </theme> tags. You may write brief reasoning before the opening tag, but nothing after the closing tag.
+- The theme system prompt must:
+  - Explicitly name the style as a guiding reference
+  - Use hard, enforceable rules only — technical and unambiguous
+  - Never reference file paths, component names, or the original project
+  - Avoid vague language ("might", "appears", etc.)
+
+REQUIRED STRUCTURE
+- Visual Objective
+- Layout & Spacing Rules
+- Typography System
+- Color & Surfaces
+- Components & Shape Language
+- Motion & Interaction
+- Forbidden Patterns
+- Self-Check
+
+FIXED TECH STACK
+- Assume React + Tailwind CSS + shadcn/ui.
+- Rules: never ship default shadcn styles, no inline styles, no arbitrary values.
+`;
+
+/**
+ * Creates a minimal AgentContext pointing at the project folder.
+ * All file tools resolve paths relative to ctx.appPath.
+ */
+function createThemeExplorationContext(
+  projectPath: string,
+  event: IpcMainInvokeEvent,
+): AgentContext {
+  return {
+    event,
+    appId: -1,
+    appPath: projectPath,
+    referencedApps: new Map(),
+    chatId: -1,
+    supabaseProjectId: null,
+    supabaseOrganizationSlug: null,
+    neonProjectId: null,
+    neonActiveBranchId: null,
+    frameworkType: null,
+    messageId: -1,
+    isSharedModulesChanged: false,
+    todos: [],
+    dyadRequestId: crypto.randomUUID(),
+    fileEditTracker: {},
+    isDyadPro: false,
+    onXmlStream: () => {},
+    onXmlComplete: () => {},
+    requireConsent: async () => true,
+    appendUserMessage: () => {},
+    onUpdateTodos: () => {},
+  };
+}
+
+const TOOL_LABEL: Record<string, string> = {
+  read_file: "Reading file",
+  list_files: "Listing files",
+  grep: "Searching",
+  glob_tool: "Finding files",
+};
+
+/**
+ * Builds a read-only tool set for project exploration (file tools only).
+ * Auto-approves all tool calls — no user consent prompts.
+ */
+function buildThemeExplorationTools(ctx: AgentContext) {
+  const explorationTools = [readFileTool, listFilesTool, grepTool, globTool];
+  const toolSet: Record<string, any> = {};
+  for (const tool of explorationTools) {
+    toolSet[tool.name] = {
+      description: tool.description,
+      inputSchema: tool.inputSchema,
+      execute: async (args: any) => {
+        try {
+          return await tool.execute(args, ctx);
+        } catch (err) {
+          return `Error: ${err instanceof Error ? err.message : String(err)}`;
+        }
+      },
+    };
+  }
+  return toolSet;
+}
+
 /**
  * Crawls a URL using a hidden Electron BrowserWindow.
- * Returns rendered page text and a PNG screenshot (base64).
+ * Returns outerHTML, CSS custom properties from :root, and a PNG screenshot (base64).
  */
 async function crawlWithElectron(
   url: string,
-): Promise<{ markdown: string; screenshot: string }> {
+): Promise<{ html: string; cssVars: string; screenshot: string }> {
   return new Promise((resolve, reject) => {
     const win = new BrowserWindow({
       width: 1280,
@@ -366,11 +520,26 @@ async function crawlWithElectron(
         clearTimeout(timeout);
         const image = await win.webContents.capturePage();
         const screenshot = image.toPNG().toString("base64");
-        const text: string = await win.webContents.executeJavaScript(
-          "document.documentElement.innerText",
+
+        const html: string = await win.webContents.executeJavaScript(
+          "document.documentElement.outerHTML",
         );
+
+        const cssVars: string = await win.webContents.executeJavaScript(`
+          (function() {
+            const style = getComputedStyle(document.documentElement);
+            const vars = [];
+            for (const prop of style) {
+              if (prop.trim().startsWith('--') && vars.length < 200) {
+                vars.push(prop.trim() + ': ' + style.getPropertyValue(prop).trim());
+              }
+            }
+            return vars.join('\\n');
+          })()
+        `);
+
         win.destroy();
-        resolve({ markdown: text, screenshot });
+        resolve({ html, cssVars, screenshot });
       } catch (err) {
         win.destroy();
         reject(err);
@@ -870,30 +1039,12 @@ export function registerThemesHandlers() {
     },
   );
 
-  // Generate theme prompt from website URL via web crawl
+  // Generate theme prompt from website URL(s) via web crawl
   createTypedHandler(
     templateContracts.generateThemeFromUrl,
     async (event, params) => {
       const { sessionId } = params;
 
-      // Synchronous validation — throws before fire-and-forget
-      let parsedUrl: URL;
-      try {
-        parsedUrl = new URL(params.url);
-      } catch {
-        throw new DyadError(
-          "Invalid URL format. Please enter a valid URL.",
-          DyadErrorKind.Validation,
-        );
-      }
-
-      if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
-        throw new Error(
-          "Invalid URL protocol. Only HTTP and HTTPS URLs are supported.",
-        );
-      }
-
-      const hostname = parsedUrl.hostname.toLowerCase();
       const blockedPatterns = [
         /^localhost$/i,
         /^127\.\d+\.\d+\.\d+$/,
@@ -904,11 +1055,30 @@ export function registerThemesHandlers() {
         /^::1$/,
         /\.local$/i,
       ];
-      if (blockedPatterns.some((p) => p.test(hostname))) {
-        throw new DyadError(
-          "Cannot crawl internal network addresses.",
-          DyadErrorKind.External,
-        );
+
+      // Synchronous validation of all URLs — throws before fire-and-forget
+      for (const url of params.urls) {
+        let parsedUrl: URL;
+        try {
+          parsedUrl = new URL(url);
+        } catch {
+          throw new DyadError(
+            `Invalid URL format: "${url}"`,
+            DyadErrorKind.Validation,
+          );
+        }
+        if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+          throw new Error(
+            `Invalid URL protocol for "${url}". Only HTTP and HTTPS are supported.`,
+          );
+        }
+        const hostname = parsedUrl.hostname.toLowerCase();
+        if (blockedPatterns.some((p) => p.test(hostname))) {
+          throw new DyadError(
+            `Cannot crawl internal network address: "${url}"`,
+            DyadErrorKind.External,
+          );
+        }
       }
 
       if (params.keywords.length > 500) {
@@ -945,34 +1115,50 @@ export function registerThemesHandlers() {
             );
           }
 
-          // Crawl phase — emit status so UI shows progress during the long wait
-          logger.log(`Crawling website for theme: ${params.url}`);
-          safeSend(event.sender, "theme:url-generate:chunk", {
-            sessionId,
-            delta: `Crawling ${params.url}...`,
-            type: "status",
-          });
+          // Crawl each URL sequentially, emitting status per URL
+          const crawlResults: Array<{
+            url: string;
+            html: string;
+            cssVars: string;
+            screenshot: string;
+          }> = [];
 
-          let crawlResult: { markdown: string; screenshot: string };
-          try {
-            crawlResult = await crawlWithElectron(params.url);
-          } catch (error) {
-            throw new Error(
-              error instanceof Error
-                ? error.message
-                : `Failed to crawl website: ${String(error)}`,
-            );
+          for (let i = 0; i < params.urls.length; i++) {
+            const url = params.urls[i];
+            const label =
+              params.urls.length > 1
+                ? `URL ${i + 1} of ${params.urls.length}: ${url}`
+                : url;
+
+            logger.log(`Crawling website for theme: ${url}`);
+            safeSend(event.sender, "theme:url-generate:chunk", {
+              sessionId,
+              delta: `Crawling ${label}...`,
+              type: "status",
+            });
+
+            let crawlResult: { html: string; cssVars: string; screenshot: string };
+            try {
+              crawlResult = await crawlWithElectron(url);
+            } catch (error) {
+              throw new Error(
+                error instanceof Error
+                  ? error.message
+                  : `Failed to crawl "${url}": ${String(error)}`,
+              );
+            }
+
+            if (!crawlResult.html) {
+              throw new Error(
+                `Failed to extract content from "${url}". Please try a different URL.`,
+              );
+            }
+
+            logger.log(`Website crawled successfully: ${url}`);
+            crawlResults.push({ url, ...crawlResult });
           }
 
-          if (!crawlResult.markdown) {
-            throw new Error(
-              "Failed to extract website content. Please try a different URL.",
-            );
-          }
-
-          logger.log(`Website crawled successfully: ${params.url}`);
-
-          // Generating phase — notify UI that crawl is done
+          // Generating phase — notify UI that all crawls are done
           safeSend(event.sender, "theme:url-generate:chunk", {
             sessionId,
             delta: "Analyzing design system...",
@@ -991,29 +1177,59 @@ export function registerThemesHandlers() {
               : WEB_CRAWL_THEME_GENERATION_META_PROMPT;
 
           const keywordsPart = sanitizeKeywords(params.keywords) || "N/A";
-          const userInput = `inspired by: ${keywordsPart}\nsource: Live website (screenshot and content provided)`;
-
-          const MAX_MARKDOWN_LENGTH = 16000;
-          const truncatedMarkdown =
-            crawlResult.markdown.length > MAX_MARKDOWN_LENGTH
-              ? crawlResult.markdown.slice(0, MAX_MARKDOWN_LENGTH) +
-                "\n<!-- truncated -->"
-              : crawlResult.markdown;
-
-          const sanitizedMarkdown = sanitizeForPrompt(truncatedMarkdown);
+          const urlList = params.urls.join(", ");
+          const userInput = `inspired by: ${keywordsPart}\nsource: ${params.urls.length} live website(s) — ${urlList} (screenshots, HTML, and CSS tokens provided)`;
 
           const contentParts: (TextPart | ImagePart)[] = [
             { type: "text", text: userInput },
-            {
-              type: "image",
-              image: crawlResult.screenshot,
-              mimeType: "image/png",
-            } as ImagePart,
-            {
-              type: "text",
-              text: `Website content (text):\n\`\`\`\n${sanitizedMarkdown}\n\`\`\``,
-            },
           ];
+
+          // Add screenshots for all crawled URLs
+          for (const result of crawlResults) {
+            contentParts.push({
+              type: "image",
+              image: result.screenshot,
+              mimeType: "image/png",
+            } as ImagePart);
+          }
+
+          // Build combined HTML + CSS vars content per URL
+          const MAX_HTML_PER_URL = 6000;
+          const MAX_CSS_VARS_PER_URL = 1500;
+
+          const combinedContent = crawlResults
+            .map((result, i) => {
+              const header =
+                crawlResults.length > 1
+                  ? `=== URL ${i + 1}: ${result.url} ===\n`
+                  : "";
+
+              const truncatedHtml =
+                result.html.length > MAX_HTML_PER_URL
+                  ? result.html.slice(0, MAX_HTML_PER_URL) + "\n<!-- truncated -->"
+                  : result.html;
+
+              const truncatedCssVars =
+                result.cssVars.length > MAX_CSS_VARS_PER_URL
+                  ? result.cssVars.slice(0, MAX_CSS_VARS_PER_URL) +
+                    "\n/* truncated */"
+                  : result.cssVars;
+
+              const sanitizedHtml = sanitizeForPrompt(truncatedHtml);
+
+              let section = header;
+              section += `HTML Structure:\n\`\`\`html\n${sanitizedHtml}\n\`\`\`\n`;
+              if (truncatedCssVars) {
+                section += `\nCSS Custom Properties:\n\`\`\`css\n${truncatedCssVars}\n\`\`\`\n`;
+              }
+              return section;
+            })
+            .join("\n\n");
+
+          contentParts.push({
+            type: "text",
+            text: `Website content:\n${combinedContent}`,
+          });
 
           const stream = streamText({
             model: modelClient.model,
@@ -1044,6 +1260,166 @@ export function registerThemesHandlers() {
               err instanceof Error
                 ? err.message
                 : "Failed to generate theme from website. Please try again.",
+          });
+        }
+      })();
+
+      return { ok: true } as const;
+    },
+  );
+
+  // Browse for a project folder via native file dialog
+  createTypedHandler(
+    templateContracts.browseProjectFolder,
+    async (_event, _params) => {
+      const result = await dialog.showOpenDialog({
+        properties: ["openDirectory"],
+        title: "Select Project Folder",
+      });
+      return { path: result.canceled ? null : (result.filePaths[0] ?? null) };
+    },
+  );
+
+  // Generate theme prompt from local project folder
+  createTypedHandler(
+    templateContracts.generateThemeFromProject,
+    async (event, params) => {
+      const { sessionId, projectPath } = params;
+
+      if (!projectPath || !projectPath.trim()) {
+        throw new DyadError(
+          "Please select a project folder",
+          DyadErrorKind.Validation,
+        );
+      }
+
+      if (params.keywords.length > 500) {
+        throw new DyadError(
+          "Keywords must be less than 500 characters",
+          DyadErrorKind.Validation,
+        );
+      }
+
+      if (!["inspired", "high-fidelity"].includes(params.generationMode)) {
+        throw new DyadError(
+          "Invalid generation mode",
+          DyadErrorKind.Validation,
+        );
+      }
+
+      // Verify the path exists and is a directory
+      try {
+        const stats = fs.statSync(projectPath);
+        if (!stats.isDirectory()) {
+          throw new DyadError(
+            "Selected path is not a directory",
+            DyadErrorKind.Validation,
+          );
+        }
+      } catch (err) {
+        if (err instanceof DyadError) throw err;
+        throw new DyadError(
+          "Project folder not found or inaccessible",
+          DyadErrorKind.Validation,
+        );
+      }
+
+      (async () => {
+        try {
+          if (IS_TEST_BUILD) {
+            const mockPrompt = `<theme>\n# Test Mode Theme (from project)\n\n## Visual Objective\nModern theme extracted from project codebase for testing.\n\n</theme>`;
+            safeSend(event.sender, "theme:project-generate:chunk", {
+              sessionId,
+              delta: mockPrompt,
+              type: "text",
+            });
+            safeSend(event.sender, "theme:project-generate:end", { sessionId });
+            return;
+          }
+
+          const selectedModel = await resolveModelParam(params.model);
+          if (!selectedModel) {
+            throw new Error(
+              `Invalid model selection: "${params.model}" could not be resolved`,
+            );
+          }
+
+          const settings = readSettings();
+          const { modelClient } = await getModelClient(
+            { provider: selectedModel.providerId, name: selectedModel.apiName },
+            settings,
+          );
+
+          const systemPrompt =
+            params.generationMode === "high-fidelity"
+              ? PROJECT_HIGH_FIDELITY_META_PROMPT
+              : PROJECT_THEME_GENERATION_META_PROMPT;
+
+          const keywordsPart = sanitizeKeywords(params.keywords) || "N/A";
+          const folderName = path.basename(projectPath);
+          const userInput =
+            `Explore the project "${folderName}" using the available tools, then generate a theme prompt.\n` +
+            `Style keywords: ${keywordsPart}`;
+
+          // Create minimal AgentContext pointing at the project folder
+          const explorationCtx = createThemeExplorationContext(projectPath, event);
+          const themeTools = buildThemeExplorationTools(explorationCtx);
+
+          safeSend(event.sender, "theme:project-generate:chunk", {
+            sessionId,
+            delta: "Exploring project...",
+            type: "status",
+          });
+
+          const stream = streamText({
+            model: modelClient.model,
+            system: systemPrompt,
+            maxRetries: 1,
+            stopWhen: stepCountIs(100),
+            messages: [{ role: "user", content: userInput }],
+            tools: themeTools,
+          });
+
+          const fullStream = stream.fullStream;
+          cancelOrphanedBaseStream(stream);
+
+          for await (const part of fullStream) {
+            if (part.type === "text-delta") {
+              safeSend(event.sender, "theme:project-generate:chunk", {
+                sessionId,
+                delta: part.text,
+                type: "text",
+              });
+            } else if (part.type === "tool-call") {
+              const input = (part as any).input ?? (part as any).args ?? {};
+              const label = TOOL_LABEL[part.toolName] ?? part.toolName.replace(/_/g, " ");
+              const detail =
+                "path" in input
+                  ? `: ${input.path}`
+                  : "pattern" in input
+                    ? `: ${input.pattern}`
+                    : "query" in input
+                      ? `: ${input.query}`
+                      : "directory" in input
+                        ? `: ${input.directory ?? "/"}`
+                        : "";
+              safeSend(event.sender, "theme:project-generate:chunk", {
+                sessionId,
+                delta: `${label}${detail}`,
+                type: "status",
+              });
+            }
+          }
+
+          safeSend(event.sender, "theme:project-generate:end", { sessionId });
+        } catch (err) {
+          logger.error("generate-theme-from-project stream error", err);
+          safeSend(event.sender, "theme:project-generate:error", {
+            sessionId,
+            error:
+              err instanceof Error
+                ? err.message
+                : "Failed to generate theme from project. Please try again.",
           });
         }
       })();

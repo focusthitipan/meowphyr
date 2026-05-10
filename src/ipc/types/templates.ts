@@ -112,8 +112,8 @@ export type ThemeGenerationModelOption = z.infer<
   typeof ThemeGenerationModelOptionSchema
 >;
 
-// Theme input source (images or URL)
-export const ThemeInputSourceSchema = z.enum(["images", "url"]);
+// Theme input source (images, URL, or project folder)
+export const ThemeInputSourceSchema = z.enum(["images", "url", "project"]);
 export type ThemeInputSource = z.infer<typeof ThemeInputSourceSchema>;
 
 // Crawl status for UI feedback
@@ -139,22 +139,47 @@ export type GenerateThemePromptResult = z.infer<
   typeof GenerateThemePromptResultSchema
 >;
 
+const UrlEntrySchema = z
+  .string()
+  .url()
+  .refine(
+    (url) => {
+      try {
+        const parsed = new URL(url);
+        return parsed.protocol === "http:" || parsed.protocol === "https:";
+      } catch {
+        return false;
+      }
+    },
+    { message: "Only HTTP and HTTPS URLs are supported" },
+  );
+
+// Project-based theme generation params
+export const BrowseProjectFolderResultSchema = z.object({
+  path: z.string().nullable(),
+});
+export type BrowseProjectFolderResult = z.infer<typeof BrowseProjectFolderResultSchema>;
+
+export const GenerateThemeFromProjectParamsSchema = z.object({
+  projectPath: z.string().min(1, "Project path is required"),
+  keywords: z.string(),
+  generationMode: ThemeGenerationModeSchema,
+  model: ThemeGenerationModelSchema,
+});
+export type GenerateThemeFromProjectParams = z.infer<typeof GenerateThemeFromProjectParamsSchema>;
+
+export const ThemeProjectGenerateStreamParamsSchema =
+  GenerateThemeFromProjectParamsSchema.extend({
+    sessionId: z.string(),
+  });
+export type ThemeProjectGenerateStreamParams = z.infer<typeof ThemeProjectGenerateStreamParamsSchema>;
+
 // URL-based theme generation params
 export const GenerateThemeFromUrlParamsSchema = z.object({
-  url: z
-    .string()
-    .url()
-    .refine(
-      (url) => {
-        try {
-          const parsed = new URL(url);
-          return parsed.protocol === "http:" || parsed.protocol === "https:";
-        } catch {
-          return false;
-        }
-      },
-      { message: "Only HTTP and HTTPS URLs are supported" },
-    ),
+  urls: z
+    .array(UrlEntrySchema)
+    .min(1, "At least one URL is required")
+    .max(3, "Maximum 3 URLs allowed"),
   keywords: z.string(),
   generationMode: ThemeGenerationModeSchema,
   model: ThemeGenerationModelSchema,
@@ -304,6 +329,18 @@ export const templateContracts = {
     input: CleanupThemeImagesParamsSchema,
     output: z.void(),
   }),
+
+  browseProjectFolder: defineContract({
+    channel: "browse-project-folder",
+    input: z.void(),
+    output: BrowseProjectFolderResultSchema,
+  }),
+
+  generateThemeFromProject: defineContract({
+    channel: "generate-theme-from-project",
+    input: ThemeProjectGenerateStreamParamsSchema,
+    output: z.object({ ok: z.literal(true) }),
+  }),
 } as const;
 
 // =============================================================================
@@ -350,6 +387,26 @@ export const themeUrlGenerateStreamContract = defineStream({
   },
 });
 
+export const themeProjectGenerateStreamContract = defineStream({
+  channel: "generate-theme-from-project",
+  input: ThemeProjectGenerateStreamParamsSchema,
+  keyField: "sessionId",
+  events: {
+    chunk: {
+      channel: "theme:project-generate:chunk",
+      payload: ThemeStreamChunkSchema,
+    },
+    end: {
+      channel: "theme:project-generate:end",
+      payload: ThemeStreamEndSchema,
+    },
+    error: {
+      channel: "theme:project-generate:error",
+      payload: ThemeStreamErrorSchema,
+    },
+  },
+});
+
 // =============================================================================
 // Template Client
 // =============================================================================
@@ -360,4 +417,7 @@ export const themeGenerateStreamClient = createStreamClient(
 );
 export const themeUrlGenerateStreamClient = createStreamClient(
   themeUrlGenerateStreamContract,
+);
+export const themeProjectGenerateStreamClient = createStreamClient(
+  themeProjectGenerateStreamContract,
 );

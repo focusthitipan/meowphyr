@@ -8,8 +8,11 @@ import { useOpenApp } from "@/hooks/useOpenApp";
 import { AppShowcaseCard } from "@/components/AppShowcaseCard";
 import { useAppThumbnails } from "@/hooks/useAppThumbnails";
 import { sortAppsForShowcase } from "@/lib/sortApps";
+import { useTranslation } from "react-i18next";
 
 export default function AppsPage() {
+  const { t } = useTranslation("home");
+  const { t: tCommon } = useTranslation();
   const router = useRouter();
   const navigate = useNavigate();
   const { apps, loading } = useLoadApps();
@@ -23,10 +26,6 @@ export default function AppsPage() {
     return sorted.filter((app) => app.name.toLowerCase().includes(q));
   }, [apps, searchQuery]);
 
-  // Fetch thumbnails for ALL apps once and filter client-side so typing in
-  // the search box doesn't trigger a burst of IPC + filesystem reads. This
-  // also lets the underlying query cache be shared with the featured
-  // showcase on the home page.
   const allAppIds = useMemo(() => apps.map((a) => a.id), [apps]);
   const thumbnailByAppId = useAppThumbnails(allAppIds);
 
@@ -48,11 +47,11 @@ export default function AppsPage() {
           className="flex items-center gap-2 mb-4 bg-(--background-lightest) py-5"
         >
           <ArrowLeft className="h-4 w-4" />
-          Go Back
+          {tCommon("goBack")}
         </Button>
 
         <header className="mb-6 text-left">
-          <h1 className="text-3xl font-bold mb-2">Apps</h1>
+          <h1 className="text-3xl font-bold mb-2">{tCommon("nav.apps")}</h1>
         </header>
 
         <div className="mb-6">
@@ -66,8 +65,8 @@ export default function AppsPage() {
             <Search className="absolute left-4 h-4 w-4 text-muted-foreground" />
             <input
               type="text"
-              placeholder="Search apps..."
-              aria-label="Search apps"
+              placeholder={t("appList.searchAppsPlaceholder")}
+              aria-label={t("appList.searchApps")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-transparent py-3 pl-11 pr-4 text-sm outline-none placeholder:text-muted-foreground"
@@ -77,18 +76,18 @@ export default function AppsPage() {
 
         {loading ? (
           <div className="text-muted-foreground text-center py-12">
-            Loading apps...
+            {t("appList.loadingApps")}
           </div>
         ) : filteredApps.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-3">
             <p className="text-muted-foreground text-center">
               {searchQuery
-                ? "No apps match your search."
-                : "You haven't created any apps yet."}
+                ? t("appList.noAppsMatchSearch")
+                : t("appList.noAppsYet")}
             </p>
             {!searchQuery && (
               <Button onClick={() => navigate({ to: "/" })} size="sm">
-                Create your first app
+                {t("appList.createFirstApp")}
               </Button>
             )}
           </div>

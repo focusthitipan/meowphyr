@@ -4,6 +4,8 @@
   "delete": "Delete",
   "confirm": "Confirm",
   "loading": "Loading...",
+  "copy": "Copy",
+  "copyErrorMessage": "Copy error message",
   "copyToClipboard": "Copy to clipboard",
   "copied": "Copied!",
   "close": "Close",
@@ -59,5 +61,11 @@
   "builtIn": "Built-in",
   "advanced": "Advanced",
   "required": "Required",
-  "optional": "Optional"
+  "optional": "Optional",
+  "nav.apps": "Apps",
+  "nav.chat": "Chat",
+  "nav.settings": "Settings",
+  "nav.library": "Library",
+  "nav.hub": "Hub",
+  "nav.help": "Help"
 }

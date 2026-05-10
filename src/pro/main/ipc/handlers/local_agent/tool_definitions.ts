@@ -450,7 +450,17 @@ export interface BuildAgentToolSetOptions {
    * Used for basic agent mode where some tools may not be available.
    */
   basicAgentMode?: boolean;
+  /**
+   * Sub-agent file access level.
+   * "read-only": exclude all state-modifying tools
+   * "staging": exclude state-modifying tools except write_file (which is path-restricted by caller)
+   * "full": no additional restrictions (default behavior)
+   */
+  subAgentPermission?: "read-only" | "staging" | "full";
 }
+
+/** Tools allowed in staging mode (write_file only — path restricted by caller) */
+const STAGING_ALLOWED_WRITE_TOOLS = new Set(["write_file"]);
 
 const FILE_EDIT_TOOLS: Set<FileEditToolName> = new Set(FILE_EDIT_TOOL_NAMES);
 
@@ -535,6 +545,18 @@ export function buildAgentToolSet(
 
     // In read-only mode, skip tools that modify state
     if (options.readOnly && tool.modifiesState) {
+      continue;
+    }
+
+    // Sub-agent permission filtering
+    if (options.subAgentPermission === "read-only" && tool.modifiesState) {
+      continue;
+    }
+    if (
+      options.subAgentPermission === "staging" &&
+      tool.modifiesState &&
+      !STAGING_ALLOWED_WRITE_TOOLS.has(tool.name)
+    ) {
       continue;
     }
 

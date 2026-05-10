@@ -21,7 +21,7 @@ export const INSPIRATION_PROMPTS = [
         />
       </svg>
     ),
-    label: "TODO list app",
+    labelKey: "inspiration.todoListApp",
   },
   {
     icon: (
@@ -39,7 +39,7 @@ export const INSPIRATION_PROMPTS = [
         />
       </svg>
     ),
-    label: "Landing Page",
+    labelKey: "inspiration.landingPage",
   },
   {
     icon: (
@@ -57,7 +57,7 @@ export const INSPIRATION_PROMPTS = [
         />
       </svg>
     ),
-    label: "Sign Up Form",
+    labelKey: "inspiration.signUpForm",
   },
   {
     icon: (
@@ -81,7 +81,7 @@ export const INSPIRATION_PROMPTS = [
         />
       </svg>
     ),
-    label: "Mood Journal & Tracker",
+    labelKey: "inspiration.moodJournal",
   },
   {
     icon: (
@@ -99,7 +99,7 @@ export const INSPIRATION_PROMPTS = [
         />
       </svg>
     ),
-    label: "Interactive Story Game",
+    labelKey: "inspiration.interactiveStoryGame",
   },
   {
     icon: (
@@ -117,7 +117,7 @@ export const INSPIRATION_PROMPTS = [
         />
       </svg>
     ),
-    label: "Recipe Finder & Meal Planner",
+    labelKey: "inspiration.recipeFinder",
   },
   {
     icon: (
@@ -135,7 +135,7 @@ export const INSPIRATION_PROMPTS = [
         />
       </svg>
     ),
-    label: "Personal Finance Dashboard",
+    labelKey: "inspiration.personalFinance",
   },
   {
     icon: (
@@ -159,7 +159,7 @@ export const INSPIRATION_PROMPTS = [
         />
       </svg>
     ),
-    label: "Travel Memory Map",
+    labelKey: "inspiration.travelMemoryMap",
   },
   {
     icon: (
@@ -177,7 +177,7 @@ export const INSPIRATION_PROMPTS = [
         />
       </svg>
     ),
-    label: "AI Writing Assistant",
+    labelKey: "inspiration.aiWritingAssistant",
   },
   {
     icon: (
@@ -195,7 +195,7 @@ export const INSPIRATION_PROMPTS = [
         />
       </svg>
     ),
-    label: "Habit Streak Tracker",
+    labelKey: "inspiration.habitStreakTracker",
   },
   {
     icon: (
@@ -213,7 +213,7 @@ export const INSPIRATION_PROMPTS = [
         />
       </svg>
     ),
-    label: "Newsletter Creator",
+    labelKey: "inspiration.newsletterCreator",
   },
   {
     icon: (
@@ -231,7 +231,7 @@ export const INSPIRATION_PROMPTS = [
         />
       </svg>
     ),
-    label: "Music Discovery App",
+    labelKey: "inspiration.musicDiscovery",
   },
   {
     icon: (
@@ -249,7 +249,7 @@ export const INSPIRATION_PROMPTS = [
         />
       </svg>
     ),
-    label: "3D Portfolio Viewer",
+    labelKey: "inspiration.portfolioViewer",
   },
   {
     icon: (
@@ -267,7 +267,7 @@ export const INSPIRATION_PROMPTS = [
         />
       </svg>
     ),
-    label: "AI Image Generator",
+    labelKey: "inspiration.aiImageGenerator",
   },
   {
     icon: (
@@ -285,7 +285,7 @@ export const INSPIRATION_PROMPTS = [
         />
       </svg>
     ),
-    label: "Pomodoro Focus Timer",
+    labelKey: "inspiration.pomodoroTimer",
   },
   {
     icon: (
@@ -303,6 +303,6 @@ export const INSPIRATION_PROMPTS = [
         />
       </svg>
     ),
-    label: "Virtual Avatar Builder",
+    labelKey: "inspiration.avatarBuilder",
   },
 ];

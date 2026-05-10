@@ -11,6 +11,7 @@ import { useSidebar } from "@/components/ui/sidebar"; // import useSidebar hook
 import { useEffect, useState, useRef } from "react";
 import { useAtom } from "jotai";
 import { dropdownOpenAtom } from "@/atoms/uiAtoms";
+import { useTranslation } from "react-i18next";
 
 import {
   Sidebar,
@@ -26,38 +27,9 @@ import {
 } from "@/components/ui/sidebar";
 import { ChatList } from "./ChatList";
 import { AppList } from "./AppList";
-import { HelpDialog } from "./HelpDialog"; // Import the new dialog
 import { SettingsList } from "./SettingsList";
 import { LibraryList } from "./LibraryList";
 
-// Menu items.
-const items = [
-  {
-    title: "Apps",
-    to: "/",
-    icon: Home,
-  },
-  {
-    title: "Chat",
-    to: "/chat",
-    icon: Inbox,
-  },
-  {
-    title: "Settings",
-    to: "/settings",
-    icon: Settings,
-  },
-  {
-    title: "Library",
-    to: "/library",
-    icon: BookOpen,
-  },
-  {
-    title: "Hub",
-    to: "/hub",
-    icon: Store,
-  },
-];
 
 // Hover state types
 type HoverState =
@@ -69,11 +41,11 @@ type HoverState =
   | "no-hover";
 
 export function AppSidebar() {
+  const { t } = useTranslation();
   const { state, toggleSidebar } = useSidebar(); // retrieve current sidebar state
   const [hoverState, setHoverState] = useState<HoverState>("no-hover");
   const expandedByHover = useRef(false);
-  const [isHelpDialogOpen, setIsHelpDialogOpen] = useState(false); // State for dialog
-  const [isDropdownOpen] = useAtom(dropdownOpenAtom);
+const [isDropdownOpen] = useAtom(dropdownOpenAtom);
 
   useEffect(() => {
     if (hoverState.startsWith("start-hover") && state === "collapsed") {
@@ -102,22 +74,22 @@ export function AppSidebar() {
 
   let selectedItem: string | null = null;
   if (hoverState === "start-hover:app") {
-    selectedItem = "Apps";
+    selectedItem = "apps";
   } else if (hoverState === "start-hover:chat") {
-    selectedItem = "Chat";
+    selectedItem = "chat";
   } else if (hoverState === "start-hover:settings") {
-    selectedItem = "Settings";
+    selectedItem = "settings";
   } else if (hoverState === "start-hover:library") {
-    selectedItem = "Library";
+    selectedItem = "library";
   } else if (state === "expanded") {
     if (isAppRoute) {
-      selectedItem = "Apps";
+      selectedItem = "apps";
     } else if (isChatRoute) {
-      selectedItem = "Chat";
+      selectedItem = "chat";
     } else if (isSettingsRoute) {
-      selectedItem = "Settings";
+      selectedItem = "settings";
     } else if (isLibraryRoute) {
-      selectedItem = "Library";
+      selectedItem = "library";
     }
   }
 
@@ -143,30 +115,25 @@ export function AppSidebar() {
           </div>
           {/* Right Column: Chat List Section */}
           <div className="w-[272px]">
-            <AppList show={selectedItem === "Apps"} />
-            <ChatList show={selectedItem === "Chat"} />
-            <SettingsList show={selectedItem === "Settings"} />
-            <LibraryList show={selectedItem === "Library"} />
+            <AppList show={selectedItem === "apps"} />
+            <ChatList show={selectedItem === "chat"} />
+            <SettingsList show={selectedItem === "settings"} />
+            <LibraryList show={selectedItem === "library"} />
           </div>
         </div>
       </SidebarContent>
 
-      <SidebarFooter>
+      <SidebarFooter className="hidden">
         <SidebarMenu>
           <SidebarMenuItem>
-            {/* Change button to open dialog instead of linking */}
             <SidebarMenuButton
               size="sm"
-              className="font-medium w-14 flex flex-col items-center gap-1 h-14 mb-2 rounded-2xl"
-              onClick={() => setIsHelpDialogOpen(true)} // Open dialog on click
+              disabled
+              className="font-medium w-14 flex flex-col items-center gap-1 h-14 mb-2 rounded-2xl opacity-40 cursor-not-allowed"
             >
               <HelpCircle className="h-5 w-5" />
-              <span className={"text-xs"}>Help</span>
+              <span className={"text-xs"}>{t("nav.help")}</span>
             </SidebarMenuButton>
-            <HelpDialog
-              isOpen={isHelpDialogOpen}
-              onClose={() => setIsHelpDialogOpen(false)}
-            />
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
@@ -181,14 +148,21 @@ function AppIcons({
 }: {
   onHoverChange: (state: HoverState) => void;
 }) {
+  const { t } = useTranslation();
   const routerState = useRouterState();
   const pathname = routerState.location.pathname;
+
+  const items = [
+    { key: "apps", title: t("nav.apps"), to: "/", icon: Home, hover: "start-hover:app" as const },
+    { key: "chat", title: t("nav.chat"), to: "/chat", icon: Inbox, hover: "start-hover:chat" as const },
+    { key: "settings", title: t("nav.settings"), to: "/settings", icon: Settings, hover: "start-hover:settings" as const },
+    { key: "library", title: t("nav.library"), to: "/library", icon: BookOpen, hover: "start-hover:library" as const },
+    { key: "hub", title: t("nav.hub"), to: "/hub", icon: Store, hover: null },
+  ];
 
   return (
     // When collapsed: only show the main menu
     <SidebarGroup className="pr-0">
-      {/* <SidebarGroupLabel>Meowphyr</SidebarGroupLabel> */}
-
       <SidebarGroupContent>
         <SidebarMenu>
           {items.map((item) => {
@@ -197,7 +171,7 @@ function AppIcons({
               (item.to !== "/" && pathname.startsWith(item.to));
 
             return (
-              <SidebarMenuItem key={item.title}>
+              <SidebarMenuItem key={item.key}>
                 <SidebarMenuButton
                   as={Link}
                   to={item.to}
@@ -206,15 +180,7 @@ function AppIcons({
                     isActive ? "bg-sidebar-accent" : ""
                   }`}
                   onMouseEnter={() => {
-                    if (item.title === "Apps") {
-                      onHoverChange("start-hover:app");
-                    } else if (item.title === "Chat") {
-                      onHoverChange("start-hover:chat");
-                    } else if (item.title === "Settings") {
-                      onHoverChange("start-hover:settings");
-                    } else if (item.title === "Library") {
-                      onHoverChange("start-hover:library");
-                    }
+                    if (item.hover) onHoverChange(item.hover);
                   }}
                 >
                   <div className="flex flex-col items-center gap-1">

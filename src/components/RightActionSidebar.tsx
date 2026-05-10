@@ -1,6 +1,6 @@
 import { useAtom, useAtomValue } from "jotai";
 import { previewModeAtom, selectedAppIdAtom } from "../atoms/appAtoms";
-import { Eye, Code, AlertTriangle, Wrench, Globe, Shield } from "lucide-react";
+import { Eye, Code, AlertTriangle, Wrench, Globe, Shield, Zap } from "lucide-react";
 import { motion } from "framer-motion";
 import { useCheckProblems } from "@/hooks/useCheckProblems";
 import { isPreviewOpenAtom } from "@/atoms/viewAtoms";
@@ -118,6 +118,12 @@ export const RightActionSidebar = () => {
           <Globe size={iconSize} />,
           t("preview.publish"),
           "publish-mode-button",
+        )}
+        {renderButton(
+          "skills",
+          <Zap size={iconSize} />,
+          t("preview.skills"),
+          "skills-mode-button",
         )}
       </div>
     </div>

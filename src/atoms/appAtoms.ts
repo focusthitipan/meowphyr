@@ -13,6 +13,7 @@ export const previewModeAtom = atom<
   | "publish"
   | "security"
   | "plan"
+  | "skills"
 >("preview");
 export const selectedVersionIdAtom = atom<string | null>(null);
 

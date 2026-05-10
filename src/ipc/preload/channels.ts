@@ -32,6 +32,7 @@ import {
   templateContracts,
   themeGenerateStreamContract,
   themeUrlGenerateStreamContract,
+  themeProjectGenerateStreamContract,
 } from "../types/templates";
 import { proposalContracts } from "../types/proposals";
 import { importContracts } from "../types/import";
@@ -62,6 +63,9 @@ const THEME_GENERATE_STREAM_CHANNELS = getStreamChannels(
 const THEME_URL_GENERATE_STREAM_CHANNELS = getStreamChannels(
   themeUrlGenerateStreamContract,
 );
+const THEME_PROJECT_GENERATE_STREAM_CHANNELS = getStreamChannels(
+  themeProjectGenerateStreamContract,
+);
 
 // Test-only channels (handler only registered in E2E test builds, but channel always allowed)
 const TEST_INVOKE_CHANNELS = [
@@ -85,6 +89,7 @@ export const VALID_INVOKE_CHANNELS = [
   HELP_STREAM_CHANNELS.invoke,
   THEME_GENERATE_STREAM_CHANNELS.invoke,
   THEME_URL_GENERATE_STREAM_CHANNELS.invoke,
+  THEME_PROJECT_GENERATE_STREAM_CHANNELS.invoke,
 
   // Integrations
   ...getInvokeChannels(githubContracts),
@@ -136,6 +141,7 @@ export const VALID_RECEIVE_CHANNELS = [
   ...HELP_STREAM_CHANNELS.receive,
   ...THEME_GENERATE_STREAM_CHANNELS.receive,
   ...THEME_URL_GENERATE_STREAM_CHANNELS.receive,
+  ...THEME_PROJECT_GENERATE_STREAM_CHANNELS.receive,
 
   // Event channels
   ...getReceiveChannels(agentEvents),

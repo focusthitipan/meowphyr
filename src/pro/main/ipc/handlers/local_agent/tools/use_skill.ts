@@ -28,7 +28,7 @@ export const useSkillTool: ToolDefinition<z.infer<typeof useSkillSchema>> = {
   },
 
   execute: async (args, ctx) => {
-    const skills = await getAllSkillsForPrompt();
+    const skills = await getAllSkillsForPrompt(ctx.appPath);
     const skill = skills.find((s) => s.slug === args.name);
     if (!skill) {
       const available = skills.map((s) => s.slug).join(", ");

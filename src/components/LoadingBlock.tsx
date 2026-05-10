@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
 import { ipc } from "@/ipc/types";
 
@@ -35,27 +36,13 @@ export const VanillaMarkdownParser = ({ content }: { content: string }) => {
 
 // Chat loader with human-like typing/deleting of rotating messages
 function ChatLoader() {
+  const { t } = useTranslation("chat");
   const [currentTextIndex, setCurrentTextIndex] = useState(0);
   const [displayText, setDisplayText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [typingSpeed, setTypingSpeed] = useState(100);
 
-  const loadingTexts = [
-    "Preparing your conversation... 🗨️",
-    "Gathering thoughts... 💭",
-    "Crafting the perfect response... 🎨",
-    "Almost there... 🚀",
-    "Just a moment... ⏳",
-    "Warming up the neural networks... 🧠",
-    "Connecting the dots... 🔗",
-    "Brewing some digital magic... ✨",
-    "Assembling words with care... 🔤",
-    "Fine-tuning the response... 🎯",
-    "Diving into deep thought... 🤿",
-    "Weaving ideas together... 🕸️",
-    "Sparking up the conversation... ⚡",
-    "Polishing the perfect reply... 💎",
-  ];
+  const loadingTexts = t("loadingMessages", { returnObjects: true }) as string[];
 
   useEffect(() => {
     const currentText = loadingTexts[currentTextIndex];

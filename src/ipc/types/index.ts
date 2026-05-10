@@ -44,6 +44,7 @@ export {
   templateContracts,
   themeGenerateStreamContract,
   themeUrlGenerateStreamContract,
+  themeProjectGenerateStreamContract,
 } from "./templates";
 export { proposalContracts } from "./proposals";
 export { importContracts } from "./import";
@@ -83,6 +84,7 @@ export {
   templateClient,
   themeGenerateStreamClient,
   themeUrlGenerateStreamClient,
+  themeProjectGenerateStreamClient,
 } from "./templates";
 export { proposalClient } from "./proposals";
 export { importClient } from "./import";
@@ -279,6 +281,9 @@ export type {
   SaveThemeImageParams,
   SaveThemeImageResult,
   CleanupThemeImagesParams,
+  BrowseProjectFolderResult,
+  GenerateThemeFromProjectParams,
+  ThemeProjectGenerateStreamParams,
 } from "./templates";
 
 // Proposal types
@@ -383,6 +388,7 @@ import {
   templateClient,
   themeGenerateStreamClient,
   themeUrlGenerateStreamClient,
+  themeProjectGenerateStreamClient,
 } from "./templates";
 import { proposalClient } from "./proposals";
 import { importClient } from "./import";
@@ -430,6 +436,7 @@ export const ipc = {
   helpStream: helpStreamClient,
   themeGenerateStream: themeGenerateStreamClient,
   themeUrlGenerateStream: themeUrlGenerateStreamClient,
+  themeProjectGenerateStream: themeProjectGenerateStreamClient,
 
   // Integrations
   github: githubClient,

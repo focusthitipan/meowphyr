@@ -2,25 +2,20 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { BookOpen, Palette, FileText, Image, Zap } from "lucide-react";
-
-type LibrarySection = {
-  id: string;
-  label: string;
-  to: string;
-  icon: React.ComponentType<{ className?: string }>;
-};
-
-const LIBRARY_SECTIONS: LibrarySection[] = [
-  { id: "all", label: "All", to: "/library", icon: BookOpen },
-  { id: "themes", label: "Themes", to: "/library/themes", icon: Palette },
-  { id: "prompts", label: "Prompts", to: "/library/prompts", icon: FileText },
-  { id: "skills", label: "Skills", to: "/library/skills", icon: Zap },
-  { id: "media", label: "Media", to: "/library/media", icon: Image },
-];
+import { useTranslation } from "react-i18next";
 
 export function LibraryList({ show }: { show: boolean }) {
+  const { t } = useTranslation("home");
   const routerState = useRouterState();
   const pathname = routerState.location.pathname;
+
+  const LIBRARY_SECTIONS = [
+    { id: "all", label: t("library.filterAll"), to: "/library", icon: BookOpen },
+    { id: "themes", label: t("library.filterThemes"), to: "/library/themes", icon: Palette },
+    { id: "prompts", label: t("library.filterPrompts"), to: "/library/prompts", icon: FileText },
+    { id: "skills", label: t("library.filterSkills"), to: "/library/skills", icon: Zap },
+    { id: "media", label: t("library.filterMedia"), to: "/library/media", icon: Image },
+  ];
 
   if (!show) {
     return null;
@@ -29,7 +24,7 @@ export function LibraryList({ show }: { show: boolean }) {
   return (
     <div className="flex flex-col h-full">
       <div className="flex-shrink-0 p-4">
-        <h2 className="text-lg font-semibold tracking-tight">Library</h2>
+        <h2 className="text-lg font-semibold tracking-tight">{t("library.title")}</h2>
       </div>
       <ScrollArea className="flex-grow">
         <div className="space-y-1 p-4 pt-0">

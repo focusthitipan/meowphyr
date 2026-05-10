@@ -6,9 +6,12 @@ import { useSettings } from "@/hooks/useSettings";
 import { useTemplates } from "@/hooks/useTemplates";
 import { TemplateCard } from "@/components/TemplateCard";
 import { CreateAppDialog } from "@/components/CreateAppDialog";
+import { useTranslation } from "react-i18next";
 
 const HubPage: React.FC = () => {
   const router = useRouter();
+  const { t } = useTranslation("home");
+  const { t: tCommon } = useTranslation();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const { templates, isLoading } = useTemplates();
   const { settings, updateSettings } = useSettings();
@@ -37,15 +40,15 @@ const HubPage: React.FC = () => {
           className="flex items-center gap-2 mb-4 bg-(--background-lightest) py-5"
         >
           <ArrowLeft className="h-4 w-4" />
-          Go Back
+          {tCommon("goBack")}
         </Button>
         <header className="mb-8 text-left">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            Pick your default template
+            {t("hub.pickDefaultTemplate")}
           </h1>
           <p className="text-md text-gray-600 dark:text-gray-400">
-            Choose a starting point for your new project.
-            {isLoading && " Loading additional templates..."}
+            {t("hub.chooseStartingPoint")}
+            {isLoading && ` ${t("hub.loadingTemplates")}`}
           </p>
         </header>
 
@@ -53,7 +56,7 @@ const HubPage: React.FC = () => {
         {officialTemplates.length > 0 && (
           <section className="mb-12">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
-              Official templates
+              {t("hub.officialTemplates")}
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {officialTemplates.map((template) => (
@@ -73,7 +76,7 @@ const HubPage: React.FC = () => {
         {communityTemplates.length > 0 && (
           <section className="mb-12">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
-              Community templates
+              {t("hub.communityTemplates")}
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {communityTemplates.map((template) => (
