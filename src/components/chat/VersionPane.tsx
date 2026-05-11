@@ -2,13 +2,13 @@ import { useAtom, useAtomValue } from "jotai";
 import { selectedAppIdAtom, selectedVersionIdAtom } from "@/atoms/appAtoms";
 import { useVersions } from "@/hooks/useVersions";
 import { formatDistanceToNow } from "date-fns";
-import { RotateCcw, X, Database, Loader2, Search } from "lucide-react";
+import { RotateCcw, X, Database, Loader2, Search, FileText, ChevronDown, ChevronRight } from "lucide-react";
 import type { Version } from "@/ipc/types";
 import { ipc } from "@/ipc/types";
 import { cn } from "@/lib/utils";
 import { queryKeys } from "@/lib/queryKeys";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useCheckoutVersion } from "@/hooks/useCheckoutVersion";
 import { useLoadApp } from "@/hooks/useLoadApp";
 import {
@@ -63,6 +63,16 @@ export function VersionPane({ isVisible, onClose }: VersionPaneProps) {
   const wasVisibleRef = useRef(false);
   const [cachedVersions, setCachedVersions] = useState<Version[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set());
+
+  const toggleFilesExpanded = useCallback((oid: string) => {
+    setExpandedFiles((prev) => {
+      const next = new Set(prev);
+      if (next.has(oid)) next.delete(oid);
+      else next.add(oid);
+      return next;
+    });
+  }, []);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const { data: screenshotsData } = useQuery({
@@ -311,6 +321,39 @@ export function VersionPane({ isVisible, onClose }: VersionPaneProps) {
                       </div>
                     </div>
                     <div className="flex items-center justify-between gap-2">
+                      {version.filesChanged && version.filesChanged.length > 0 && (
+                        <div className="mt-1 w-full">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleFilesExpanded(version.oid);
+                            }}
+                            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                          >
+                            {expandedFiles.has(version.oid) ? (
+                              <ChevronDown size={10} />
+                            ) : (
+                              <ChevronRight size={10} />
+                            )}
+                            <FileText size={10} />
+                            {version.filesChanged.length}{" "}
+                            {version.filesChanged.length === 1 ? "file" : "files"} changed
+                          </button>
+                          {expandedFiles.has(version.oid) && (
+                            <ul className="mt-1 ml-3 space-y-0.5">
+                              {version.filesChanged.map((f) => (
+                                <li
+                                  key={f}
+                                  className="text-[11px] font-mono text-muted-foreground truncate"
+                                  title={f}
+                                >
+                                  {f}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      )}
                       {version.message && (
                         <p className="mt-1 text-sm">
                           <HighlightMatch

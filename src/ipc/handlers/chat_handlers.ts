@@ -13,6 +13,7 @@ import {
   getInitialChatModeForNewChat,
   normalizeStoredChatMode,
 } from "./chat_mode_resolution";
+import { getMidTurnCompactionSummaryIds } from "./compaction/compaction_utils";
 
 const logger = log.scope("chat_handlers");
 
@@ -82,14 +83,17 @@ export function registerChatHandlers() {
       throw new DyadError("Chat not found", DyadErrorKind.NotFound);
     }
 
+    const midTurnSummaryIds = getMidTurnCompactionSummaryIds(chat.messages);
     return {
       ...chat,
       title: chat.title ?? "",
       chatMode: normalizeStoredChatMode(chat.chatMode),
-      messages: chat.messages.map((m) => ({
-        ...m,
-        role: m.role as "user" | "assistant",
-      })),
+      messages: chat.messages
+        .filter((m) => !midTurnSummaryIds.has(m.id))
+        .map((m) => ({
+          ...m,
+          role: m.role as "user" | "assistant",
+        })),
     };
   });
 

@@ -210,6 +210,26 @@ export function useStreamChat({
         let postEndChunkCount = 0;
         let isPostEnd = false;
 
+        // Watchdog: if no chunk arrives for 3 minutes, assume the end signal
+        // was lost (safeSend dropped it) and reset the streaming state.
+        const WATCHDOG_TIMEOUT_MS = 3 * 60 * 1000;
+        let lastActivityTime = Date.now();
+        const watchdogTimer = setInterval(() => {
+          if (isPostEnd) {
+            clearInterval(watchdogTimer);
+            return;
+          }
+          if (Date.now() - lastActivityTime > WATCHDOG_TIMEOUT_MS) {
+            clearInterval(watchdogTimer);
+            pendingStreamChatIds.delete(chatId);
+            setIsStreamingById((prev) => {
+              const next = new Map(prev);
+              next.set(chatId, false);
+              return next;
+            });
+          }
+        }, 15_000);
+
         ipc.chatStream.start(
           {
             chatId,
@@ -230,6 +250,7 @@ export function useStreamChat({
               effectiveChatMode,
               chatModeFallbackReason,
             }) => {
+              lastActivityTime = Date.now();
               if (isPostEnd) postEndChunkCount++;
               if (
                 handleEffectiveChatModeChunk(
@@ -283,6 +304,7 @@ export function useStreamChat({
               }
             },
             onEnd: (response: ChatResponseEnd) => {
+              clearInterval(watchdogTimer);
               pendingStreamChatIds.delete(chatId);
               isPostEnd = true;
               void (async () => {

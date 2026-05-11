@@ -4,7 +4,6 @@ import { z } from "zod";
 import log from "electron-log";
 import { ToolDefinition, AgentContext, escapeXmlAttr } from "./types";
 import { safeJoin } from "@/ipc/utils/path_utils";
-import { gitAdd, gitRemove } from "@/ipc/utils/git_utils";
 import {
   deploySupabaseFunction,
   deleteSupabaseFunction,
@@ -14,6 +13,7 @@ import {
   isSharedServerModule,
 } from "../../../../../../supabase_admin/supabase_utils";
 import { queueCloudSandboxSnapshotSync } from "@/ipc/utils/cloud_sandbox_provider";
+import { backupFileBeforeChange } from "@/ipc/utils/file_history_backup";
 
 const logger = log.scope("rename_file");
 
@@ -54,19 +54,15 @@ export const renameFileTool: ToolDefinition<z.infer<typeof renameFileSchema>> =
       const dirPath = path.dirname(toFullPath);
       fs.mkdirSync(dirPath, { recursive: true });
 
+      // Backup both: source (will be gone) and destination (may be overwritten)
+      await backupFileBeforeChange(ctx.appId, ctx.messageId, ctx.appPath, args.from);
+      await backupFileBeforeChange(ctx.appId, ctx.messageId, ctx.appPath, args.to);
+
       if (fs.existsSync(fromFullPath)) {
         fs.renameSync(fromFullPath, toFullPath);
         logger.log(
           `Successfully renamed file: ${fromFullPath} -> ${toFullPath}`,
         );
-
-        // Update git
-        await gitAdd({ path: ctx.appPath, filepath: args.to });
-        try {
-          await gitRemove({ path: ctx.appPath, filepath: args.from });
-        } catch (error) {
-          logger.warn(`Failed to git remove old file ${args.from}:`, error);
-        }
 
         // Handle Supabase functions
         if (ctx.supabaseProjectId) {

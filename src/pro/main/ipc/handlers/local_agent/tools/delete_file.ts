@@ -4,7 +4,6 @@ import { z } from "zod";
 import log from "electron-log";
 import { ToolDefinition, AgentContext, escapeXmlAttr } from "./types";
 import { safeJoin } from "@/ipc/utils/path_utils";
-import { gitRemove } from "@/ipc/utils/git_utils";
 import { deleteSupabaseFunction } from "../../../../../../supabase_admin/supabase_management_client";
 import {
   isServerFunction,
@@ -12,6 +11,7 @@ import {
 } from "../../../../../../supabase_admin/supabase_utils";
 import { DyadError, DyadErrorKind } from "@/errors/dyad_error";
 import { queueCloudSandboxSnapshotSync } from "@/ipc/utils/cloud_sandbox_provider";
+import { backupFileBeforeChange } from "@/ipc/utils/file_history_backup";
 
 const logger = log.scope("delete_file");
 
@@ -65,6 +65,8 @@ export const deleteFileTool: ToolDefinition<z.infer<typeof deleteFileSchema>> =
         ctx.isSharedModulesChanged = true;
       }
 
+      await backupFileBeforeChange(ctx.appId, ctx.messageId, ctx.appPath, args.path);
+
       if (fs.existsSync(fullFilePath)) {
         if (fs.lstatSync(fullFilePath).isDirectory()) {
           fs.rmdirSync(fullFilePath, { recursive: true });
@@ -72,13 +74,6 @@ export const deleteFileTool: ToolDefinition<z.infer<typeof deleteFileSchema>> =
           fs.unlinkSync(fullFilePath);
         }
         logger.log(`Successfully deleted file: ${fullFilePath}`);
-
-        // Remove from git
-        try {
-          await gitRemove({ path: ctx.appPath, filepath: args.path });
-        } catch (error) {
-          logger.warn(`Failed to git remove deleted file ${args.path}:`, error);
-        }
 
         // Delete Supabase function if applicable
         if (ctx.supabaseProjectId && isServerFunction(args.path)) {

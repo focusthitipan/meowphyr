@@ -92,7 +92,10 @@ import {
   performCompaction,
   checkAndMarkForCompaction,
 } from "@/ipc/handlers/compaction/compaction_handler";
-import { getPostCompactionMessages } from "@/ipc/handlers/compaction/compaction_utils";
+import {
+  getPostCompactionMessages,
+  getMidTurnCompactionSummaryIds,
+} from "@/ipc/handlers/compaction/compaction_utils";
 import { DEFAULT_MAX_TOOL_CALL_STEPS } from "@/constants/settings_constants";
 import { DyadError, DyadErrorKind } from "@/errors/dyad_error";
 import {
@@ -263,34 +266,6 @@ function injectReferencedAppsReminder(
   }
 }
 
-function getMidTurnCompactionSummaryIds(
-  chatMessages: Array<{
-    id: number;
-    role: string;
-    createdAt: Date;
-    isCompactionSummary: boolean | null;
-  }>,
-): Set<number> {
-  const hiddenIds = new Set<number>();
-
-  for (const summary of chatMessages.filter((m) => m.isCompactionSummary)) {
-    const triggeringUserMessage = [...chatMessages]
-      .filter((m) => m.role === "user" && m.id < summary.id)
-      .sort((a, b) => b.id - a.id)[0];
-
-    if (!triggeringUserMessage) {
-      continue;
-    }
-
-    if (
-      summary.createdAt.getTime() >= triggeringUserMessage.createdAt.getTime()
-    ) {
-      hiddenIds.add(summary.id);
-    }
-  }
-
-  return hiddenIds;
-}
 
 /**
  * Replace the dyad-status block identified by slotId in content with replacement.
@@ -669,6 +644,9 @@ export async function handleLocalAgentStream(
       onWarningMessage: (message) => {
         warningMessages.push(message);
       },
+      sendHeartbeat: () => {
+        safeSend(event.sender, "chat:response:chunk", { chatId: chat.id });
+      },
       swarm,
       agentName: "leader",
       runSubAgent: async (
@@ -972,6 +950,21 @@ export async function handleLocalAgentStream(
               : `\n\nFILE ACCESS: Full access. You may read and write files anywhere in the project.`;
         const subStreamResult = streamText({
           model: modelClient.model,
+          headers: {
+            ...getAiHeaders({
+              builtinProviderId: modelClient.builtinProviderId,
+            }),
+            [DYAD_INTERNAL_REQUEST_ID_HEADER]: dyadRequestId,
+          },
+          providerOptions: getProviderOptions({
+            dyadAppId: chat.app.id,
+            dyadRequestId,
+            dyadDisableFiles: true,
+            files: [],
+            mentionedAppsCodebases: [],
+            builtinProviderId: modelClient.builtinProviderId,
+            settings,
+          }),
           system: `You are a focused sub-agent. Your task: ${description}\n\nThink step-by-step. Use the available tools to complete the task. Explain your reasoning between tool calls, then return a clear, concise summary of what you did and the outcome.${permissionSuffix}${bgSuffix}`,
           messages: [{ role: "user", content: prompt }],
           tools: subToolSet,
@@ -1544,14 +1537,18 @@ export async function handleLocalAgentStream(
               if (
                 settings.enableContextCompaction === false ||
                 compactedMidTurn ||
-                typeof step.usage.totalTokens !== "number"
+                typeof step.usage.inputTokens !== "number"
               ) {
                 return;
               }
 
+              // Total context usage = non-cached input + cached input.
+              // For Anthropic/DeepSeek, inputTokens is non-cached only.
+              const stepTotalInputTokens =
+                step.usage.inputTokens + (step.usage.cachedInputTokens ?? 0);
               const shouldCompact = await checkAndMarkForCompaction(
                 req.chatId,
-                step.usage.totalTokens,
+                stepTotalInputTokens,
               );
 
               // If this step triggered tool calls, compact before the next step
@@ -1581,10 +1578,15 @@ export async function handleLocalAgentStream(
                   ? (cachedInputTokens ?? 0) / (inputTokens ?? 0)
                   : 0,
               );
-              if (typeof totalTokens === "number") {
+              if (typeof inputTokens === "number") {
                 await db
                   .update(messages)
-                  .set({ maxTokensUsed: totalTokens })
+                  .set({
+                    maxTokensUsed: inputTokens + (cachedInputTokens ?? 0),
+                    inputTokens,
+                    outputTokens: response.usage?.outputTokens ?? null,
+                    cachedInputTokens: cachedInputTokens ?? null,
+                  })
                   .where(eq(messages.id, placeholderMessageId))
                   .catch((err) =>
                     logger.error("Failed to save token count", err),

@@ -1,0 +1,1 @@
+ALTER TABLE `chats` ADD `compaction_failure_count` integer DEFAULT 0;

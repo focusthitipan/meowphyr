@@ -6,7 +6,7 @@
 import { IpcMainInvokeEvent } from "electron";
 import { streamText, ModelMessage } from "ai";
 import log from "electron-log";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import { chats, messages } from "@/db/schema";
@@ -78,6 +78,9 @@ export async function isChatPendingCompaction(
   }
 }
 
+/** Maximum consecutive compaction failures before circuit breaker trips. */
+const COMPACTION_FAILURE_CIRCUIT_BREAKER_THRESHOLD = 3;
+
 /**
  * Check if compaction should be triggered based on token usage.
  */
@@ -89,6 +92,21 @@ export async function checkAndMarkForCompaction(
 
   // Skip if compaction is disabled
   if (settings.enableContextCompaction === false) {
+    return false;
+  }
+
+  // Circuit breaker: skip if too many consecutive failures
+  const chat = await db.query.chats.findFirst({
+    where: eq(chats.id, chatId),
+    columns: { compactionFailureCount: true },
+  });
+  if (
+    (chat?.compactionFailureCount ?? 0) >=
+    COMPACTION_FAILURE_CIRCUIT_BREAKER_THRESHOLD
+  ) {
+    logger.warn(
+      `Compaction circuit breaker tripped for chat ${chatId}: ${chat?.compactionFailureCount} consecutive failures`,
+    );
     return false;
   }
 
@@ -256,13 +274,14 @@ Note: This file may be large. Read only the sections you need or use grep to sea
       createdAt: compactionCreatedAt,
     });
 
-    // Update chat record
+    // Update chat record — reset failure count on success
     await db
       .update(chats)
       .set({
         compactedAt: new Date(),
         compactionBackupPath: backupPath,
         pendingCompaction: false,
+        compactionFailureCount: 0,
       })
       .where(eq(chats.id, chatId));
 
@@ -284,8 +303,22 @@ Note: This file may be large. Read only the sections you need or use grep to sea
   } catch (error) {
     logger.error(`Compaction failed for chat ${chatId}:`, error);
 
-    // Clear pending flag to prevent infinite retry loops
-    await clearPendingCompaction(chatId);
+    // Increment failure count for circuit breaker, clear pending flag
+    await db
+      .update(chats)
+      .set({
+        pendingCompaction: false,
+        compactionFailureCount: sql`COALESCE(compaction_failure_count, 0) + 1`,
+      })
+      .where(eq(chats.id, chatId));
+
+    const updatedChat = await db.query.chats.findFirst({
+      where: eq(chats.id, chatId),
+      columns: { compactionFailureCount: true },
+    });
+    logger.warn(
+      `Compaction failure count for chat ${chatId}: ${updatedChat?.compactionFailureCount ?? 1}/${COMPACTION_FAILURE_CIRCUIT_BREAKER_THRESHOLD}`,
+    );
 
     return {
       success: false,

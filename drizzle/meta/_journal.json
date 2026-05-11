@@ -211,6 +211,20 @@
       "when": 1778145045517,
       "tag": "0029_foamy_mandroid",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "6",
+      "when": 1778488657426,
+      "tag": "0030_cuddly_spirit",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "6",
+      "when": 1778491977098,
+      "tag": "0031_orange_devos",
+      "breakpoints": true
     }
   ]
 }

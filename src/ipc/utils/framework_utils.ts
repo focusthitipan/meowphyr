@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import * as path from "path";
+import { execSync } from "node:child_process";
 import {
   NEXTJS_CONFIG_FILES,
   type AppFrameworkType,
@@ -70,9 +71,19 @@ function hasNitro(
 
 export type PackageManager = "pnpm" | "yarn" | "bun" | "npm";
 
+function isCommandAvailable(cmd: string): boolean {
+  try {
+    execSync(`${cmd} --version`, { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
- * Detect the package manager by checking for lock files.
- * Falls back to "npm" when none are found.
+ * Detect the package manager by checking lock files, then verifying the
+ * detected manager is actually installed. Falls back through pnpm → yarn → npm
+ * if the lock-file-detected manager isn't available on PATH.
  */
 export function detectPackageManager(appPath: string): PackageManager {
   const lockFiles: Array<[string, PackageManager]> = [
@@ -82,8 +93,18 @@ export function detectPackageManager(appPath: string): PackageManager {
     ["bun.lock", "bun"],
     ["package-lock.json", "npm"],
   ];
+
   for (const [file, pm] of lockFiles) {
-    if (fs.existsSync(path.join(appPath, file))) return pm;
+    if (fs.existsSync(path.join(appPath, file))) {
+      if (pm === "npm" || isCommandAvailable(pm)) return pm;
+      // Detected manager not installed — fall back gracefully
+      break;
+    }
+  }
+
+  // Fallback: use whatever is available
+  for (const pm of ["pnpm", "yarn", "npm"] as PackageManager[]) {
+    if (pm === "npm" || isCommandAvailable(pm)) return pm;
   }
   return "npm";
 }

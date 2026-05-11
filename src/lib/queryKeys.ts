@@ -87,7 +87,7 @@ export const queryKeys = {
   // ─────────────────────────────────────────────────────────────────────────────
   versions: {
     all: ["versions"] as const,
-    list: ({ appId }: { appId: number | null }) => ["versions", appId] as const,
+    list: ({ appId, chatId }: { appId: number | null; chatId?: number | null }) => ["versions", appId, chatId ?? null] as const,
   },
 
   branches: {

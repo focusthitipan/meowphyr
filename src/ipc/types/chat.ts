@@ -183,14 +183,11 @@ export type TokenCountParams = z.infer<typeof TokenCountParamsSchema>;
  * Schema for token count result.
  */
 export const TokenCountResultSchema = z.object({
-  estimatedTotalTokens: z.number(),
-  actualMaxTokens: z.number().nullable(),
-  messageHistoryTokens: z.number(),
-  codebaseTokens: z.number(),
-  mentionedAppsTokens: z.number(),
-  inputTokens: z.number(),
-  systemPromptTokens: z.number(),
   contextWindow: z.number(),
+  // Actual API-reported token counts (null if no response yet)
+  actualInputTokens: z.number().nullable(),
+  actualOutputTokens: z.number().nullable(),
+  actualCachedInputTokens: z.number().nullable(),
 });
 
 export type TokenCountResult = z.infer<typeof TokenCountResultSchema>;

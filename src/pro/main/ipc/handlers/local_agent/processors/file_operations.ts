@@ -4,11 +4,6 @@
 
 import log from "electron-log";
 import {
-  gitCommit,
-  gitAddAll,
-  getGitUncommittedFiles,
-} from "@/ipc/utils/git_utils";
-import {
   deployAllSupabaseFunctions,
   type SupabaseDeployProgress,
 } from "../../../../../../supabase_admin/supabase_utils";
@@ -109,47 +104,13 @@ export async function deployAllFunctionsIfNeeded(
 }
 
 /**
- * Commit all changes
+ * Previously committed AI changes to git. Now a no-op — file history is
+ * tracked via the file_history_backup system instead, keeping user git
+ * history clean.
  */
 export async function commitAllChanges(
-  ctx: Pick<AgentContext, "appPath" | "supabaseProjectId">,
-  chatSummary?: string,
-): Promise<{
-  commitHash?: string;
-}> {
-  try {
-    // Check for uncommitted changes
-    const uncommittedFiles = await getGitUncommittedFiles({
-      path: ctx.appPath,
-    });
-    const message = chatSummary
-      ? `[dyad] ${chatSummary}`
-      : `[dyad] (${uncommittedFiles.length} files changed)`;
-    let commitHash: string | undefined;
-
-    if (uncommittedFiles.length > 0) {
-      await gitAddAll({ path: ctx.appPath });
-      try {
-        commitHash = await gitCommit({
-          path: ctx.appPath,
-          message: message,
-        });
-      } catch (error) {
-        logger.error(
-          `Failed to commit extra files: ${uncommittedFiles.join(", ")}`,
-          error,
-        );
-      }
-    }
-
-    return {
-      commitHash,
-    };
-  } catch (error) {
-    logger.error(`Failed to commit changes: ${error}`);
-    throw new DyadError(
-      `Failed to commit changes: ${error}`,
-      DyadErrorKind.External,
-    );
-  }
+  _ctx: Pick<AgentContext, "appPath" | "supabaseProjectId">,
+  _chatSummary?: string,
+): Promise<{ commitHash?: string }> {
+  return {};
 }

@@ -1,9 +1,6 @@
 import { db } from "../../db";
-import { apps, messages, versions } from "../../db/schema";
-import { desc, eq, and, gt, gte } from "drizzle-orm";
-import type { GitCommit } from "../git_types";
-import fs from "node:fs";
-import path from "node:path";
+import { apps, chats, messages } from "../../db/schema";
+import { desc, eq, and, gte, lt, inArray } from "drizzle-orm";
 import { getDyadAppPath } from "../../paths/paths";
 import { withLock } from "../utils/lock_utils";
 import log from "electron-log";
@@ -12,27 +9,17 @@ import { versionContracts } from "../types/version";
 
 import { deployAllSupabaseFunctions } from "../../supabase_admin/supabase_utils";
 import { readSettings } from "../../main/settings";
+import fs from "node:fs";
+import path from "node:path";
 import {
-  gitCheckout,
-  gitCommit,
-  gitStageToRevert,
-  getCurrentCommitHash,
-  gitCurrentBranch,
-  gitLog,
-  isGitStatusClean,
-} from "../utils/git_utils";
+  restoreFilesToBeforeMessage,
+  hasBackup,
+  listBackupFiles,
+  evictBackupsBeyondLimit,
+} from "../utils/file_history_backup";
 
-import {
-  getNeonClient,
-  getNeonErrorMessage,
-} from "../../neon_admin/neon_management_client";
-import { getConnectionUri } from "../../neon_admin/neon_context";
-import {
-  updatePostgresUrlEnvVar,
-  updateDbPushEnvVar,
-} from "../utils/app_env_var_utils";
-import { storeDbTimestampAtCurrentVersion } from "../utils/neon_timestamp_utils";
-import { retryOnLocked } from "../utils/retryOnLocked";
+const MAX_SNAPSHOTS_PER_CHAT = 100;
+import { gitCurrentBranch } from "../utils/git_utils";
 import { DyadError, DyadErrorKind } from "@/errors/dyad_error";
 import { syncCloudSandboxSnapshot } from "../utils/cloud_sandbox_provider";
 
@@ -49,39 +36,9 @@ async function syncCloudSandboxSnapshotBestEffort(appId: number) {
   }
 }
 
-async function restoreBranchForPreview({
-  appId,
-  dbTimestamp,
-  neonProjectId,
-  previewBranchId,
-  developmentBranchId,
-}: {
-  appId: number;
-  dbTimestamp: string;
-  neonProjectId: string;
-  previewBranchId: string;
-  developmentBranchId: string;
-}): Promise<void> {
-  try {
-    const neonClient = await getNeonClient();
-    await retryOnLocked(
-      () =>
-        neonClient.restoreProjectBranch(neonProjectId, previewBranchId, {
-          source_branch_id: developmentBranchId,
-          source_timestamp: dbTimestamp,
-        }),
-      `Restore preview branch ${previewBranchId} for app ${appId}`,
-    );
-  } catch (error) {
-    const errorMessage = getNeonErrorMessage(error);
-    logger.error("Error in restoreBranchForPreview:", errorMessage);
-    throw new Error(errorMessage);
-  }
-}
-
 export function registerVersionHandlers() {
   createTypedHandler(versionContracts.listVersions, async (_, params) => {
-    const { appId } = params;
+    const { appId, chatId } = params;
     const app = await db.query.apps.findFirst({
       where: eq(apps.id, appId),
     });
@@ -91,44 +48,75 @@ export function registerVersionHandlers() {
       return [];
     }
 
-    const appPath = getDyadAppPath(app.path);
-
-    // Just return an empty array if the app is not a git repo.
-    if (!fs.existsSync(path.join(appPath, ".git"))) {
-      return [];
+    // Scope to the current chat if provided (Claude Code behavior), otherwise all chats
+    let chatIds: number[];
+    if (chatId !== undefined) {
+      chatIds = [chatId];
+    } else {
+      const appChats = await db.query.chats.findMany({
+        where: eq(chats.appId, appId),
+      });
+      if (appChats.length === 0) return [];
+      chatIds = appChats.map((c) => c.id);
     }
 
-    const commits = await gitLog({
-      path: appPath,
-      depth: 100_000, // KEEP UP TO DATE WITH ChatHeader.tsx
+    // Get assistant messages for the scoped chat(s), newest first
+    const assistantMessages = await db.query.messages.findMany({
+      where: and(
+        eq(messages.role, "assistant"),
+        inArray(messages.chatId, chatIds),
+      ),
+      orderBy: desc(messages.id),
     });
 
-    // Get all snapshots for this app to match with commits
-    const appSnapshots = await db.query.versions.findMany({
-      where: eq(versions.appId, appId),
+    // Also fetch preceding user messages for descriptions
+    const userMessages = await db.query.messages.findMany({
+      where: and(
+        eq(messages.role, "user"),
+        inArray(messages.chatId, chatIds),
+      ),
     });
+    const userMsgByChatAndId = new Map<string, (typeof userMessages)[0]>();
+    for (const msg of userMessages) {
+      userMsgByChatAndId.set(`${msg.chatId}:${msg.id}`, msg);
+    }
 
-    // Create a map of commitHash -> snapshot info for quick lookup
-    const snapshotMap = new Map<
-      string,
-      { neonDbTimestamp: string | null; createdAt: Date }
-    >();
-    for (const snapshot of appSnapshots) {
-      snapshotMap.set(snapshot.commitHash, {
-        neonDbTimestamp: snapshot.neonDbTimestamp,
-        createdAt: snapshot.createdAt,
+    // Build versions: only include turns where files were backed up
+    const result = [];
+    for (const msg of assistantMessages) {
+      if (!hasBackup(appId, msg.id)) continue;
+
+      // Find the user message just before this assistant message in same chat
+      const precedingUser = userMessages
+        .filter((u) => u.chatId === msg.chatId && u.id < msg.id)
+        .sort((a, b) => b.id - a.id)[0];
+
+      const description = precedingUser
+        ? precedingUser.content.slice(0, 80)
+        : "(no prompt)";
+
+      result.push({
+        oid: String(msg.id),
+        message: description,
+        timestamp: msg.createdAt
+          ? Math.floor(msg.createdAt.getTime() / 1000)
+          : 0,
+        dbTimestamp: null,
+        filesChanged: listBackupFiles(appId, msg.id),
       });
     }
 
-    return commits.map((commit: GitCommit) => {
-      const snapshotInfo = snapshotMap.get(commit.oid);
-      return {
-        oid: commit.oid,
-        message: commit.commit.message,
-        timestamp: commit.commit.author.timestamp,
-        dbTimestamp: snapshotInfo?.neonDbTimestamp,
-      };
-    });
+    // Enforce MAX_SNAPSHOTS_PER_CHAT — result is newest-first, keep the first N
+    if (result.length > MAX_SNAPSHOTS_PER_CHAT) {
+      result.splice(MAX_SNAPSHOTS_PER_CHAT);
+      const keepIds = new Set(result.map((v) => parseInt(v.oid)));
+      // Only evict disk backups when scoped to a single chat (avoids cross-chat collateral)
+      if (chatId !== undefined) {
+        evictBackupsBeyondLimit(appId, keepIds);
+      }
+    }
+
+    return result;
   });
 
   createTypedHandler(versionContracts.getCurrentBranch, async (_, params) => {
@@ -166,194 +154,66 @@ export function registerVersionHandlers() {
   createTypedHandler(versionContracts.revertVersion, async (_, params) => {
     const { appId, previousVersionId, currentChatMessageId } = params;
     return withLock(appId, async () => {
-      let successMessage = "Restored version";
-      let warningMessage = "";
+      const targetMessageId = parseInt(previousVersionId);
+      if (isNaN(targetMessageId)) {
+        throw new DyadError(
+          `Invalid version ID: ${previousVersionId}`,
+          DyadErrorKind.Validation,
+        );
+      }
+
       const app = await db.query.apps.findFirst({
         where: eq(apps.id, appId),
       });
-
       if (!app) {
         throw new DyadError("App not found", DyadErrorKind.NotFound);
       }
 
       const appPath = getDyadAppPath(app.path);
-      // Get the current commit hash before reverting
-      const currentCommitHash = await getCurrentCommitHash({
-        path: appPath,
-        ref: "main",
+
+      // Restore files to their state before this message's edits — no git commit created
+      await restoreFilesToBeforeMessage(appId, targetMessageId, appPath);
+
+      // Delete messages from the triggering user message onwards
+      const targetMessage = await db.query.messages.findFirst({
+        where: eq(messages.id, targetMessageId),
       });
+      let restoredPrompt: string | undefined;
+      if (targetMessage) {
+        const chatId = currentChatMessageId?.chatId ?? targetMessage.chatId;
 
-      await gitCheckout({
-        path: appPath,
-        ref: "main",
-      });
-
-      if (app.neonProjectId && app.neonDevelopmentBranchId) {
-        // We are going to add a new commit on top, so let's store
-        // the current timestamp at the current version.
-        await storeDbTimestampAtCurrentVersion({
-          appId,
-        });
-      }
-
-      await gitStageToRevert({
-        path: appPath,
-        targetOid: previousVersionId,
-      });
-      const isClean = await isGitStatusClean({ path: appPath });
-      if (!isClean) {
-        await gitCommit({
-          path: appPath,
-          message: `Reverted all changes back to version ${previousVersionId}`,
-        });
-      }
-
-      // Delete messages based on currentChatMessageId if provided, otherwise use commit hash lookup
-      if (currentChatMessageId) {
-        // Delete all messages including and after the specified message
-        const { chatId, messageId } = currentChatMessageId;
-
-        const messagesToDelete = await db.query.messages.findMany({
-          where: and(eq(messages.chatId, chatId), gte(messages.id, messageId)),
+        // Find the user message that immediately preceded this AI response
+        // so we delete it too (the prompt that caused this turn)
+        const precedingUserMsg = await db.query.messages.findFirst({
+          where: and(
+            eq(messages.chatId, chatId),
+            eq(messages.role, "user"),
+            lt(messages.id, targetMessageId),
+          ),
           orderBy: desc(messages.id),
         });
 
-        logger.log(
-          `Deleting ${messagesToDelete.length} messages (id >= ${messageId}) from chat ${chatId}`,
-        );
+        // Capture the prompt to restore it to the input box
+        restoredPrompt = precedingUserMsg?.content;
 
-        if (messagesToDelete.length > 0) {
-          await db
-            .delete(messages)
-            .where(
-              and(eq(messages.chatId, chatId), gte(messages.id, messageId)),
-            );
-        }
-      } else {
-        // Find the chat and message associated with the commit hash
-        const messageWithCommit = await db.query.messages.findFirst({
-          where: eq(messages.commitHash, previousVersionId),
-          with: {
-            chat: true,
-          },
-        });
+        const deleteFromId =
+          currentChatMessageId?.messageId ??
+          precedingUserMsg?.id ??
+          targetMessageId;
 
-        // If we found a message with this commit hash, delete all subsequent messages (but keep this message)
-        if (messageWithCommit) {
-          const chatId = messageWithCommit.chatId;
-
-          // Find all messages in this chat with IDs > the one with our commit hash
-          const messagesToDelete = await db.query.messages.findMany({
-            where: and(
-              eq(messages.chatId, chatId),
-              gt(messages.id, messageWithCommit.id),
-            ),
-            orderBy: desc(messages.id),
-          });
-
-          logger.log(
-            `Deleting ${messagesToDelete.length} messages after commit ${previousVersionId} from chat ${chatId}`,
+        await db
+          .delete(messages)
+          .where(
+            and(eq(messages.chatId, chatId), gte(messages.id, deleteFromId)),
           );
-
-          // Delete the messages
-          if (messagesToDelete.length > 0) {
-            await db
-              .delete(messages)
-              .where(
-                and(
-                  eq(messages.chatId, chatId),
-                  gt(messages.id, messageWithCommit.id),
-                ),
-              );
-          }
-        }
+        logger.log(
+          `Deleted messages from chat ${chatId} with id >= ${deleteFromId}`,
+        );
       }
 
-      if (app.neonProjectId && app.neonDevelopmentBranchId) {
-        const version = await db.query.versions.findFirst({
-          where: and(
-            eq(versions.appId, appId),
-            eq(versions.commitHash, previousVersionId),
-          ),
-        });
-        if (version && version.neonDbTimestamp) {
-          try {
-            const preserveBranchName = `preserve_${currentCommitHash}-${Date.now()}`;
-            const neonClient = await getNeonClient();
-            const response = await retryOnLocked(
-              () =>
-                neonClient.restoreProjectBranch(
-                  app.neonProjectId!,
-                  app.neonDevelopmentBranchId!,
-                  {
-                    source_branch_id: app.neonDevelopmentBranchId!,
-                    source_timestamp: version.neonDbTimestamp!,
-                    preserve_under_name: preserveBranchName,
-                  },
-                ),
-              `Restore development branch ${app.neonDevelopmentBranchId} for app ${appId}`,
-            );
-            // Update all versions which have a newer DB timestamp than the version we're restoring to
-            // and remove their DB timestamp.
-            await db
-              .update(versions)
-              .set({ neonDbTimestamp: null })
-              .where(
-                and(
-                  eq(versions.appId, appId),
-                  gt(versions.neonDbTimestamp, version.neonDbTimestamp),
-                ),
-              );
-
-            const preserveBranchId = response.data.branch.parent_id;
-            if (!preserveBranchId) {
-              throw new DyadError(
-                "Preserve branch ID not found",
-                DyadErrorKind.NotFound,
-              );
-            }
-            logger.info(
-              `Deleting preserve branch ${preserveBranchId} for app ${appId}`,
-            );
-            try {
-              // Intentionally do not await this because it's not
-              // critical for the restore operation, it's to clean up branches
-              // so the user doesn't hit the branch limit later.
-              retryOnLocked(
-                () =>
-                  neonClient.deleteProjectBranch(
-                    app.neonProjectId!,
-                    preserveBranchId,
-                  ),
-                `Delete preserve branch ${preserveBranchId} for app ${appId}`,
-                { retryBranchWithChildError: true },
-              );
-            } catch (error) {
-              const errorMessage = getNeonErrorMessage(error);
-              logger.error("Error in deleteProjectBranch:", errorMessage);
-            }
-          } catch (error) {
-            const errorMessage = getNeonErrorMessage(error);
-            logger.error("Error in restoreBranchForCheckout:", errorMessage);
-            warningMessage = `Could not restore database because of error: ${errorMessage}`;
-            // Do not throw, so we can finish switching the postgres branch
-            // It might throw because they picked a timestamp that's too old.
-          }
-          successMessage =
-            "Successfully restored to version (including database)";
-        }
-        await switchPostgresToDevelopmentBranch({
-          neonProjectId: app.neonProjectId,
-          neonDevelopmentBranchId: app.neonDevelopmentBranchId,
-          appPath: app.path,
-        });
-      }
-      // Re-deploy all Supabase edge functions after reverting
+      // Re-deploy Supabase edge functions if needed
       if (app.supabaseProjectId) {
         try {
-          logger.info(
-            `Re-deploying all Supabase edge functions for app ${appId} after revert`,
-          );
           const settings = readSettings();
           const deployErrors = await deployAllSupabaseFunctions({
             appPath,
@@ -361,130 +221,27 @@ export function registerVersionHandlers() {
             supabaseOrganizationSlug: app.supabaseOrganizationSlug ?? null,
             skipPruneEdgeFunctions: settings.skipPruneEdgeFunctions ?? false,
           });
-
           if (deployErrors.length > 0) {
-            warningMessage += `Some Supabase functions failed to deploy after revert: ${deployErrors.join(", ")}`;
-            logger.warn(warningMessage);
-            // Note: We don't fail the revert operation if function deployment fails
-            // The code has been successfully reverted, but functions may be out of sync
-          } else {
-            logger.info(
-              `Successfully re-deployed all Supabase edge functions for app ${appId}`,
-            );
+            return {
+              warningMessage: `Restored, but some Supabase functions failed to deploy: ${deployErrors.join(", ")}`,
+            };
           }
         } catch (error) {
-          warningMessage += `Error re-deploying Supabase edge functions after revert: ${error}`;
-          logger.warn(warningMessage);
-          // Continue with the revert operation even if function deployment fails
+          return {
+            warningMessage: `Restored, but error re-deploying Supabase functions: ${error}`,
+          };
         }
       }
+
       await syncCloudSandboxSnapshotBestEffort(appId);
-      if (warningMessage) {
-        return { warningMessage };
-      }
-      return { successMessage };
+      return { successMessage: "Restored version", restoredPrompt };
     });
   });
 
-  createTypedHandler(versionContracts.checkoutVersion, async (_, params) => {
-    const { appId, versionId: gitRef } = params;
-    return withLock(appId, async () => {
-      const app = await db.query.apps.findFirst({
-        where: eq(apps.id, appId),
-      });
-
-      if (!app) {
-        throw new DyadError("App not found", DyadErrorKind.NotFound);
-      }
-
-      if (
-        app.neonProjectId &&
-        app.neonDevelopmentBranchId &&
-        app.neonPreviewBranchId
-      ) {
-        if (gitRef === "main") {
-          logger.info(
-            `Switching Postgres to development branch for app ${appId}`,
-          );
-          await switchPostgresToDevelopmentBranch({
-            neonProjectId: app.neonProjectId,
-            neonDevelopmentBranchId: app.neonDevelopmentBranchId,
-            appPath: app.path,
-          });
-        } else {
-          logger.info(`Switching Postgres to preview branch for app ${appId}`);
-
-          // Regardless of whether we have a timestamp or not, we want to disable DB push
-          // while we're checking out an earlier version
-          await updateDbPushEnvVar({
-            appPath: app.path,
-            disabled: true,
-          });
-
-          const version = await db.query.versions.findFirst({
-            where: and(
-              eq(versions.appId, appId),
-              eq(versions.commitHash, gitRef),
-            ),
-          });
-
-          if (version && version.neonDbTimestamp) {
-            // SWITCH the env var for POSTGRES_URL to the preview branch
-            const connectionUri = await getConnectionUri({
-              projectId: app.neonProjectId,
-              branchId: app.neonPreviewBranchId,
-            });
-
-            await restoreBranchForPreview({
-              appId,
-              dbTimestamp: version.neonDbTimestamp,
-              neonProjectId: app.neonProjectId,
-              previewBranchId: app.neonPreviewBranchId,
-              developmentBranchId: app.neonDevelopmentBranchId,
-            });
-
-            await updatePostgresUrlEnvVar({
-              appPath: app.path,
-              connectionUri,
-            });
-            logger.info(
-              `Switched Postgres to preview branch for app ${appId} commit ${version.commitHash} dbTimestamp=${version.neonDbTimestamp}`,
-            );
-          }
-        }
-      }
-      const fullAppPath = getDyadAppPath(app.path);
-      await gitCheckout({
-        path: fullAppPath,
-        ref: gitRef,
-      });
-      await syncCloudSandboxSnapshotBestEffort(appId);
-    });
+  // checkoutVersion is a no-op in the file-history-based system.
+  // Versions are previewed by restoring — there are no per-turn git commits to checkout.
+  createTypedHandler(versionContracts.checkoutVersion, async () => {
+    return;
   });
 }
 
-async function switchPostgresToDevelopmentBranch({
-  neonProjectId,
-  neonDevelopmentBranchId,
-  appPath,
-}: {
-  neonProjectId: string;
-  neonDevelopmentBranchId: string;
-  appPath: string;
-}) {
-  // SWITCH the env var for POSTGRES_URL to the development branch
-  const connectionUri = await getConnectionUri({
-    projectId: neonProjectId,
-    branchId: neonDevelopmentBranchId,
-  });
-
-  await updatePostgresUrlEnvVar({
-    appPath,
-    connectionUri,
-  });
-
-  await updateDbPushEnvVar({
-    appPath,
-    disabled: false,
-  });
-}

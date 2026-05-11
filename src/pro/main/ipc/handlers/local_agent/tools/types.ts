@@ -127,6 +127,11 @@ export interface AgentContext {
    * Undefined for the leader/main agent (which uses "leader").
    */
   agentName?: string;
+  /**
+   * Sends a heartbeat to keep the renderer's streaming watchdog alive.
+   * Call this during long-running tool executions (e.g. package install).
+   */
+  sendHeartbeat?: () => void;
 }
 
 // ============================================================================

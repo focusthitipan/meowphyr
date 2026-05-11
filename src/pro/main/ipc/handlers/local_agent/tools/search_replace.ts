@@ -20,6 +20,7 @@ import { sendTelemetryEvent } from "@/ipc/utils/telemetry";
 import { DyadError, DyadErrorKind } from "@/errors/dyad_error";
 import { queueCloudSandboxSnapshotSync } from "@/ipc/utils/cloud_sandbox_provider";
 import { withLock, getFileWriteKey } from "@/ipc/utils/lock_utils";
+import { backupFileBeforeChange } from "@/ipc/utils/file_history_backup";
 
 const logger = log.scope("search_replace");
 
@@ -106,6 +107,8 @@ CRITICAL REQUIREMENTS FOR USING THIS TOOL:
     if (isSharedServerModule(args.file_path)) {
       ctx.isSharedModulesChanged = true;
     }
+
+    await backupFileBeforeChange(ctx.appId, ctx.messageId, ctx.appPath, args.file_path);
 
     await withLock(getFileWriteKey(fullFilePath), async () => {
       if (!fs.existsSync(fullFilePath)) {

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { ToolDefinition, AgentContext, escapeXmlAttr } from "./types";
 import { executeCopyFile } from "@/ipc/utils/copy_file_utils";
+import { backupFileBeforeChange } from "@/ipc/utils/file_history_backup";
 import { queueCloudSandboxSnapshotSync } from "@/ipc/utils/cloud_sandbox_provider";
 
 const copyFileSchema = z.object({
@@ -32,6 +33,8 @@ export const copyFileTool: ToolDefinition<z.infer<typeof copyFileSchema>> = {
   },
 
   execute: async (args, ctx: AgentContext) => {
+    await backupFileBeforeChange(ctx.appId, ctx.messageId, ctx.appPath, args.to);
+
     const result = await executeCopyFile({
       from: args.from,
       to: args.to,

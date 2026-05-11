@@ -33,6 +33,26 @@ function getChatBackupDir(appPath: string, chatId: number): string {
 }
 
 /**
+ * Strip image data from message content before summarization.
+ * Images (base64 or URL) waste tokens in the compaction LLM call and may
+ * cause errors with models that don't support vision.
+ * Replaces each image with a lightweight placeholder.
+ */
+export function stripImages(content: string): string {
+  // Strip <dyad-attachment> image tags (base64 or media URL)
+  let result = content.replace(
+    /<dyad-attachment[^>]*type="image[^"]*"[^>]*>[\s\S]*?<\/dyad-attachment>/g,
+    "[image removed for summarization]",
+  );
+  // Also strip self-closing dyad-attachment image tags
+  result = result.replace(
+    /<dyad-attachment[^>]*type="image[^"]*"[^>]*\/>/g,
+    "[image removed for summarization]",
+  );
+  return result;
+}
+
+/**
  * Transform dyad-specific tool XML tags to shorter, LLM-friendly equivalents
  * and truncate large tool results for token efficiency.
  */
@@ -78,7 +98,8 @@ export function formatAsTranscript(
 
   const body = messages
     .map(
-      (m) => `<msg role="${m.role}">\n${transformToolTags(m.content)}\n</msg>`,
+      (m) =>
+        `<msg role="${m.role}">\n${transformToolTags(stripImages(m.content))}\n</msg>`,
     )
     .join("\n\n");
 

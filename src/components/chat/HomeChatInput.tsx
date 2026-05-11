@@ -122,7 +122,10 @@ export function HomeChatInput({
       await toggleRecording();
     }
 
-    if (attachments.length > 0 && !modelSupportsVision) {
+    const hasImageAttachments = attachments.some((a) =>
+      a.file.type.startsWith("image/"),
+    );
+    if (hasImageAttachments && !modelSupportsVision) {
       showError(
         "The selected model does not support image input. Please remove the attachments or switch to a model with Vision enabled.",
       );
@@ -169,7 +172,7 @@ export function HomeChatInput({
           />
 
           {/* Vision not supported warning */}
-          {attachments.length > 0 && !modelSupportsVision && (
+          {attachments.some((a) => a.file.type.startsWith("image/")) && !modelSupportsVision && (
             <div className="mx-3 mb-1 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-xs text-destructive">
               The selected model does not support image input. Remove the attachments or switch to a model with Vision enabled.
             </div>

@@ -83,6 +83,7 @@ export const chats = sqliteTable("chats", {
   compactedAt: integer("compacted_at", { mode: "timestamp" }),
   compactionBackupPath: text("compaction_backup_path"),
   pendingCompaction: integer("pending_compaction", { mode: "boolean" }),
+  compactionFailureCount: integer("compaction_failure_count").default(0),
   chatMode: text("chat_mode").$type<StoredChatMode | null>(),
 });
 
@@ -101,8 +102,11 @@ export const messages = sqliteTable("messages", {
   // The commit hash of the codebase at the time the message was sent
   commitHash: text("commit_hash"),
   requestId: text("request_id"),
-  // Max tokens used for this message (only for assistant messages)
+  // Token usage from API (only for assistant messages)
   maxTokensUsed: integer("max_tokens_used"),
+  inputTokens: integer("input_tokens"),
+  outputTokens: integer("output_tokens"),
+  cachedInputTokens: integer("cached_input_tokens"),
   // Model name used for this message (only for assistant messages)
   model: text("model"),
   // AI SDK messages (v5 envelope) for preserving tool calls/results in agent mode

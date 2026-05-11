@@ -126,6 +126,12 @@ import {
 } from "../utils/versioned_codebase_context";
 import { getAiMessagesJsonIfWithinLimit } from "../utils/ai_messages_utils";
 import { readSettings } from "@/main/settings";
+import {
+  checkAndMarkForCompaction,
+  isChatPendingCompaction,
+  performCompaction,
+} from "./compaction/compaction_handler";
+import { getPostCompactionMessages } from "./compaction/compaction_utils";
 
 type AsyncIterableStream<T> = AsyncIterable<T> & ReadableStream<T>;
 
@@ -292,6 +298,25 @@ export function registerChatStreamHandlers() {
         );
       }
 
+      // Run pending compaction before processing the new message
+      if (await isChatPendingCompaction(req.chatId)) {
+        const compactionRequestId = uuidv4();
+        const appPath = getDyadAppPath(chat.app.path);
+        logger.info(`Running pending compaction for chat ${req.chatId}`);
+        await performCompaction(event, req.chatId, appPath, compactionRequestId);
+        // Reload chat so message history reflects the compaction summary
+        const reloadedChat = await db.query.chats.findFirst({
+          where: eq(chats.id, req.chatId),
+          with: {
+            messages: { orderBy: (m, { asc }) => [asc(m.createdAt)] },
+            app: true,
+          },
+        });
+        if (reloadedChat) {
+          Object.assign(chat, reloadedChat);
+        }
+      }
+
       // Handle redo option: remove the most recent messages if needed
       if (req.redo) {
         // Get the most recent messages
@@ -377,12 +402,13 @@ export function registerChatStreamHandlers() {
           } else {
             // For chat-context, provide file info for reference (no path to avoid auto-copying)
             attachmentInfo += `- ${attachment.name} (${attachment.type})\n`;
-            // If it's a text-based file, try to include the content
+            // If it's a text-based file, embed the content directly in the prompt
             if (await isTextFile(persistentPath)) {
               try {
+                const fileContent = await readFile(persistentPath, "utf-8");
                 attachmentInfo += `<dyad-text-attachment filename="${escapeXmlAttr(attachment.name)}" type="${escapeXmlAttr(attachment.type)}" path="${escapeXmlAttr(persistentPath)}">
-                </dyad-text-attachment>
-                \n\n`;
+${fileContent}
+</dyad-text-attachment>\n\n`;
               } catch (err) {
                 logger.error(`Error reading file content: ${err}`);
               }
@@ -754,8 +780,9 @@ ${componentSnippet}
           codebaseInfo.length / 4,
         );
 
-        // Prepare message history for the AI
-        const messageHistoryRaw = updatedChat.messages.map((message) => ({
+        // Prepare message history for the AI — only include messages after the
+        // latest compaction boundary so pre-compaction messages are hidden from the model.
+        const messageHistoryRaw = getPostCompactionMessages(updatedChat.messages).map((message) => ({
           role: message.role as "user" | "assistant" | "system",
           content: message.content,
           sourceCommitHash: message.sourceCommitHash,
@@ -1103,6 +1130,12 @@ This conversation includes one or more image attachments. When the user uploads 
             } satisfies ModelMessage,
           ];
         }
+        // Mid-turn compaction state (scoped to the current chat turn)
+        let compactBeforeNextStep = false;
+        let compactedMidTurn = false;
+        let compactionFailedMidTurn = false;
+        let midTurnBaseHistoryCount = 0;
+
         const simpleStreamText = async ({
           chatMessages,
           modelClient,
@@ -1110,6 +1143,7 @@ This conversation includes one or more image attachments. When the user uploads 
           systemPromptOverride = systemPrompt,
           dyadDisableFiles = false,
           files,
+          prepareStep: externalPrepareStep,
         }: {
           chatMessages: ModelMessage[];
           modelClient: ModelClient;
@@ -1117,6 +1151,7 @@ This conversation includes one or more image attachments. When the user uploads 
           tools?: ToolSet;
           systemPromptOverride?: string;
           dyadDisableFiles?: boolean;
+          prepareStep?: Parameters<typeof streamText>[0]["prepareStep"];
         }) => {
           if (isEngineEnabled) {
             logger.log(
@@ -1162,29 +1197,62 @@ This conversation includes one or more image attachments. When the user uploads 
             system: systemPromptOverride,
             tools,
             messages: chatMessages.filter((m) => m.content),
-            onFinish: async (response) => {
-              const totalTokens = response.usage?.totalTokens;
+            prepareStep: externalPrepareStep,
+            onStepFinish: async (step) => {
+              // Use inputTokens (prompt tokens) — what actually fills the context window.
+              // totalTokens includes output tokens which don't count against the input limit.
+              const stepInputTokens = step.usage?.inputTokens;
+              const stepOutputTokens = step.usage?.outputTokens;
+              const stepCachedInputTokens = step.usage?.cachedInputTokens;
 
-              if (typeof totalTokens === "number") {
-                // We use the highest total tokens used (we are *not* accumulating)
-                // since we're trying to figure it out if we're near the context limit.
-                maxTokensUsed = Math.max(maxTokensUsed ?? 0, totalTokens);
+              if (typeof stepInputTokens === "number") {
+                // Total context usage = non-cached input + cached input.
+                // For Anthropic/DeepSeek, inputTokens is non-cached only.
+                const stepTotalInputTokens =
+                  stepInputTokens + (stepCachedInputTokens ?? 0);
+                maxTokensUsed = Math.max(
+                  maxTokensUsed ?? 0,
+                  stepTotalInputTokens,
+                );
 
-                // Persist the aggregated token usage on the placeholder assistant message
+                // Persist all token breakdown fields on the placeholder assistant message
                 await db
                   .update(messages)
-                  .set({ maxTokensUsed: maxTokensUsed })
+                  .set({
+                    maxTokensUsed,
+                    inputTokens: stepInputTokens,
+                    outputTokens: stepOutputTokens ?? null,
+                    cachedInputTokens: stepCachedInputTokens ?? null,
+                  })
                   .where(eq(messages.id, placeholderAssistantMessage.id))
                   .catch((error) => {
                     logger.error(
-                      "Failed to save total tokens for assistant message",
+                      "Failed to save token usage for assistant message",
                       error,
                     );
                   });
 
                 logger.log(
-                  `Total tokens used (aggregated for message ${placeholderAssistantMessage.id}): ${maxTokensUsed}`,
+                  `Input tokens: ${stepInputTokens}, output: ${stepOutputTokens}, cached: ${stepCachedInputTokens}`,
                 );
+
+                // Mark chat for compaction if near context limit (checked per step
+                // so multi-step MCP tool chains don't blow past the threshold)
+                const shouldCompact = await checkAndMarkForCompaction(
+                  req.chatId,
+                  maxTokensUsed,
+                );
+
+                // If this step used tools and triggered the threshold, request
+                // mid-turn compaction before the next step (same pattern as local agent).
+                if (
+                  shouldCompact &&
+                  step.toolCalls.length > 0 &&
+                  !compactedMidTurn &&
+                  !compactionFailedMidTurn
+                ) {
+                  compactBeforeNextStep = true;
+                }
               } else {
                 logger.log("Total tokens used: unknown");
               }
@@ -1432,11 +1500,99 @@ This conversation includes one or more image attachments. When the user uploads 
           }
         }
 
+        // Set up mid-turn compaction for the main stream.
+        // Reset per-turn flags so fix/continuation sub-streams don't interfere.
+        compactBeforeNextStep = false;
+        compactedMidTurn = false;
+        compactionFailedMidTurn = false;
+        // chatMessages is filtered by streamText internally; match that count.
+        midTurnBaseHistoryCount = chatMessages.filter((m) => m.content).length;
+
+        const mainPrepareStep: Parameters<typeof streamText>[0]["prepareStep"] =
+          async (options) => {
+            if (!compactBeforeNextStep || compactedMidTurn) return undefined;
+
+            compactBeforeNextStep = false;
+            // Messages generated during the current turn (not yet in DB)
+            const inFlightTailMessages = options.messages.slice(
+              midTurnBaseHistoryCount,
+            );
+
+            logger.info(
+              `Mid-turn compaction triggered for chat ${req.chatId} (step ${options.stepNumber})`,
+            );
+            const compactionId = uuidv4();
+            const compactionResult = await performCompaction(
+              event,
+              req.chatId,
+              getDyadAppPath(updatedChat.app.path),
+              compactionId,
+            );
+
+            if (!compactionResult.success) {
+              logger.warn(
+                `Mid-turn compaction failed for chat ${req.chatId}: ${compactionResult.error}`,
+              );
+              compactionFailedMidTurn = true;
+              return undefined;
+            }
+
+            compactedMidTurn = true;
+
+            // Reload chat to get updated messages with the new compaction summary
+            const reloadedChat = await db.query.chats.findFirst({
+              where: eq(chats.id, req.chatId),
+              with: {
+                messages: {
+                  orderBy: (m, { asc }) => [asc(m.createdAt)],
+                },
+                app: true,
+              },
+            });
+            if (!reloadedChat) return undefined;
+
+            // Rebuild conversational history after compaction boundary, excluding
+            // the in-flight placeholder assistant message (not yet persisted properly)
+            const newConvHistory = getPostCompactionMessages(
+              reloadedChat.messages,
+            )
+              .filter(
+                (m) =>
+                  m.content && m.id !== placeholderAssistantMessage.id,
+              )
+              .map((m) => ({
+                role: m.role as "user" | "assistant" | "system",
+                content: removeNonEssentialTags(m.content ?? ""),
+                providerOptions: {
+                  "dyad-engine": {
+                    sourceCommitHash: m.sourceCommitHash,
+                    commitHash: m.commitHash,
+                  },
+                },
+              }));
+
+            const newMessages = [
+              ...codebasePrefix,
+              ...otherCodebasePrefix,
+              ...newConvHistory,
+              ...inFlightTailMessages,
+            ];
+
+            // Update base count so subsequent steps slice correctly
+            midTurnBaseHistoryCount = newMessages.length - inFlightTailMessages.length;
+
+            logger.info(
+              `Mid-turn compaction: rebuilt history ${options.messages.length} → ${newMessages.length} messages for chat ${req.chatId}`,
+            );
+            return { messages: newMessages };
+          };
+
         // When calling streamText, the messages need to be properly formatted for mixed content
         const { fullStream } = await simpleStreamText({
           chatMessages,
           modelClient,
           files: files,
+          prepareStep: mainPrepareStep,
         });
 
         // Process the stream as before

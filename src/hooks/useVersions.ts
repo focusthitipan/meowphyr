@@ -3,7 +3,11 @@ import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { versionsListAtom } from "@/atoms/appAtoms";
 import { ipc, type RevertVersionResponse, type Version } from "@/ipc/types";
 
-import { chatMessagesByIdAtom, selectedChatIdAtom } from "@/atoms/chatAtoms";
+import {
+  chatMessagesByIdAtom,
+  chatInputValueAtom,
+  selectedChatIdAtom,
+} from "@/atoms/chatAtoms";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/queryKeys";
 import { toast } from "sonner";
@@ -15,6 +19,7 @@ export function useVersions(appId: number | null) {
   const [, setVersionsAtom] = useAtom(versionsListAtom);
   const selectedChatId = useAtomValue(selectedChatIdAtom);
   const setMessagesById = useSetAtom(chatMessagesByIdAtom);
+  const setChatInput = useSetAtom(chatInputValueAtom);
   const queryClient = useQueryClient();
   const { restartApp } = useRunApp();
   const { settings } = useSettings();
@@ -25,12 +30,15 @@ export function useVersions(appId: number | null) {
     error,
     refetch: refreshVersions,
   } = useQuery<Version[], Error>({
-    queryKey: queryKeys.versions.list({ appId }),
+    queryKey: queryKeys.versions.list({ appId, chatId: selectedChatId }),
     queryFn: async (): Promise<Version[]> => {
       if (appId === null) {
         return [];
       }
-      return ipc.version.listVersions({ appId });
+      return ipc.version.listVersions({
+        appId,
+        chatId: selectedChatId ?? undefined,
+      });
     },
     enabled: appId !== null,
     placeholderData: [],
@@ -74,8 +82,12 @@ export function useVersions(appId: number | null) {
       } else if ("warningMessage" in result) {
         toast.warning(result.warningMessage);
       }
+      // Restore the deleted prompt back into the input box
+      if (result.restoredPrompt) {
+        setChatInput(result.restoredPrompt);
+      }
       await queryClient.invalidateQueries({
-        queryKey: queryKeys.versions.list({ appId }),
+        queryKey: queryKeys.versions.list({ appId, chatId: selectedChatId }),
       });
       await queryClient.invalidateQueries({
         queryKey: queryKeys.branches.current({ appId }),

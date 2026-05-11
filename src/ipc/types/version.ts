@@ -10,6 +10,7 @@ export const VersionSchema = z.object({
   message: z.string(),
   timestamp: z.number(),
   dbTimestamp: z.string().nullable().optional(),
+  filesChanged: z.array(z.string()).optional(),
 });
 
 export type Version = z.infer<typeof VersionSchema>;
@@ -34,8 +35,8 @@ export const RevertVersionParamsSchema = z.object({
 export type RevertVersionParams = z.infer<typeof RevertVersionParamsSchema>;
 
 export const RevertVersionResponseSchema = z.union([
-  z.object({ successMessage: z.string() }),
-  z.object({ warningMessage: z.string() }),
+  z.object({ successMessage: z.string(), restoredPrompt: z.string().optional() }),
+  z.object({ warningMessage: z.string(), restoredPrompt: z.string().optional() }),
 ]);
 
 export type RevertVersionResponse = z.infer<typeof RevertVersionResponseSchema>;
@@ -52,7 +53,7 @@ export const CheckoutVersionParamsSchema = z.object({
 export const versionContracts = {
   listVersions: defineContract({
     channel: "list-versions",
-    input: z.object({ appId: z.number() }),
+    input: z.object({ appId: z.number(), chatId: z.number().optional() }),
     output: z.array(VersionSchema),
   }),
 

@@ -588,7 +588,16 @@ export function buildAgentToolSet(
           // (including failures) for retry/fallback telemetry
           trackFileEditTool(ctx, tool.name, processedArgs);
 
-          const result = await tool.execute(processedArgs, ctx);
+          // Send periodic heartbeats during tool execution so the renderer's
+          // streaming watchdog doesn't time out on long-running tools (e.g. pnpm install).
+          ctx.sendHeartbeat?.();
+          const heartbeatInterval = setInterval(
+            () => ctx.sendHeartbeat?.(),
+            60_000,
+          );
+          const result = await tool
+            .execute(processedArgs, ctx)
+            .finally(() => clearInterval(heartbeatInterval));
 
           return convertToolResultForAiSdk(result);
         } catch (error) {

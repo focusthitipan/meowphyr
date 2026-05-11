@@ -94,7 +94,7 @@ After every edit, read the file to verify changes applied correctly. If somethin
 </file_editing_tool_selection>`;
 
 const PRO_DEVELOPMENT_WORKFLOW_BLOCK = `<development_workflow>
-1. **Understand:** Think about the user's request and the relevant codebase context. Use \`grep\` and \`code_search\` search tools extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions. Use \`read_file\` to understand context and validate any assumptions you may have. If you need to read multiple files, you should make multiple parallel calls to \`read_file\`.
+1. **Understand:** Think about the user's request and the relevant codebase context. Use \`grep\` and \`code_search\` search tools extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions. Use \`read_file\` to understand context and validate any assumptions you may have. If you need to read multiple files, you should make multiple parallel calls to \`read_file\` — but limit to **at most 5 files per batch** to keep context manageable. Read the most relevant files first; only read additional files if needed.
 2. **Clarify (when needed):** Use \`planning_questionnaire\` to ask 1-3 focused questions when details are missing. Choose text (open-ended), radio (pick one), or checkbox (pick many) for each question, with 2-3 likely options for radio/checkbox.
    **Use when:** creating a new app/project, the request is vague (e.g. "Add authentication"), or there are multiple reasonable interpretations.
    **Skip when:** the request is specific and concrete (e.g. "Fix the login button", "Change color from blue to green").
@@ -132,7 +132,7 @@ After every edit, read the file to verify changes applied correctly. If somethin
 </file_editing_tool_selection>`;
 
 const BASIC_DEVELOPMENT_WORKFLOW_BLOCK = `<development_workflow>
-1. **Understand:** Think about the user's request and the relevant codebase context. Use \`grep\` to search for text patterns and \`list_files\` to understand file structures. Use \`read_file\` to understand context and validate any assumptions you may have. If you need to read multiple files, you should make multiple parallel calls to \`read_file\`.
+1. **Understand:** Think about the user's request and the relevant codebase context. Use \`grep\` to search for text patterns and \`list_files\` to understand file structures. Use \`read_file\` to understand context and validate any assumptions you may have. If you need to read multiple files, you should make multiple parallel calls to \`read_file\` — but limit to **at most 5 files per batch** to keep context manageable. Read the most relevant files first; only read additional files if needed.
 2. **Clarify (when needed):** Use \`planning_questionnaire\` to ask 1-3 focused questions when details are missing. Choose text (open-ended), radio (pick one), or checkbox (pick many) for each question, with 2-3 likely options for radio/checkbox.
    **Use when:** creating a new app/project, the request is vague (e.g. "Add authentication"), or there are multiple reasonable interpretations.
    **Skip when:** the request is specific and concrete (e.g. "Fix the login button", "Change color from blue to green").
