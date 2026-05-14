@@ -31,6 +31,7 @@ import {
   pendingAgentConsentsAtom,
   agentTodosByChatIdAtom,
   needsFreshPlanChatAtom,
+  streamingTokensByChatIdAtom,
 } from "@/atoms/chatAtoms";
 import { atom, useAtom, useSetAtom, useAtomValue } from "jotai";
 import { useStreamChat } from "@/hooks/useStreamChat";
@@ -60,6 +61,7 @@ import { DragDropOverlay } from "./DragDropOverlay";
 import { FileAttachmentTypeDialog } from "./FileAttachmentTypeDialog";
 import { showExtraFilesToast, showInfo, showWarning } from "@/lib/toast";
 import { useSummarizeInNewChat } from "./SummarizeInNewChatButton";
+import { AI_RULES_PROMPT } from "@/components/ImportAppDialog";
 import { ChatInputControls } from "../ChatInputControls";
 import { ChatErrorBox } from "./ChatErrorBox";
 import { AgentConsentBanner } from "./AgentConsentBanner";
@@ -325,16 +327,18 @@ export function ChatInput({ chatId }: { chatId?: number }) {
   ]);
 
   // Token counting for context limit banner
-  const { result: tokenCountResult } = useCountTokens(
-    !isStreaming ? (chatId ?? null) : null,
+  const streamingTokensById = useAtomValue(streamingTokensByChatIdAtom);
+  const streamingTokens = chatId ? streamingTokensById.get(chatId) : undefined;
+  const { result: dbTokenCountResult } = useCountTokens(
+    streamingTokens ? null : (chatId ?? null),
     "",
   );
+  const tokenCountResult = streamingTokens ?? dbTokenCountResult;
 
   const totalInputForBanner =
     (tokenCountResult?.actualInputTokens ?? 0) +
     (tokenCountResult?.actualCachedInputTokens ?? 0);
   const showBanner =
-    !isStreaming &&
     tokenCountResult &&
     shouldShowContextLimitBanner({
       totalTokens: totalInputForBanner,
@@ -512,6 +516,41 @@ export function ChatInput({ chatId }: { chatId?: number }) {
         "The selected model does not support image input. Please remove the attachments or switch to a model with Vision enabled.",
       );
       return;
+    }
+
+    // Handle built-in slash commands before sending to AI
+    const trimmedInput = inputValue.trim();
+    if (trimmedInput.startsWith("/") && attachments.length === 0) {
+      const commandName = trimmedInput.slice(1).split(/\s/)[0].toLowerCase();
+
+      if (commandName === "new") {
+        setInputValue("");
+        await handleNewChat();
+        return;
+      }
+
+      if (commandName === "compact" && chatId) {
+        setInputValue("");
+        await streamMessage({
+          prompt: "",
+          chatId,
+          redo: false,
+          triggerManualCompaction: true,
+        });
+        return;
+      }
+
+      if (commandName === "init" && chatId) {
+        setInputValue("");
+        await streamMessage({
+          prompt: AI_RULES_PROMPT,
+          chatId,
+          redo: false,
+        });
+        clearAttachments();
+        posthog.capture("chat:submit", { chatMode, source: "slash-init" });
+        return;
+      }
     }
 
     // Build prompt with auto-added image mentions

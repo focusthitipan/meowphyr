@@ -32,24 +32,30 @@ export function registerTokenCountHandlers() {
         );
       }
 
-      // Use actual API-reported token counts from the last non-summary assistant message.
-      // Compaction summary messages don't have token data stored.
-      const lastAssistantMessage = [...chat.messages]
+      // Find the most recent assistant message that has real API token data.
+      // Includes compaction summaries since they now store actual usage too.
+      // Falls back to older messages if the latest was interrupted mid-stream.
+      const lastMessageWithTokens = [...chat.messages]
         .reverse()
-        .find((m) => m.role === "assistant" && !m.isCompactionSummary);
+        .find(
+          (m) => m.role === "assistant" && m.inputTokens !== null,
+        );
+
+      const contextWindow = await getContextWindow();
 
       logger.log(
         `Token counts for chat ${req.chatId}:`,
-        `input=${lastAssistantMessage?.inputTokens}`,
-        `output=${lastAssistantMessage?.outputTokens}`,
-        `cached=${lastAssistantMessage?.cachedInputTokens}`,
+        `input=${lastMessageWithTokens?.inputTokens}`,
+        `output=${lastMessageWithTokens?.outputTokens}`,
+        `cached=${lastMessageWithTokens?.cachedInputTokens}`,
+        `isCompactionSummary=${lastMessageWithTokens?.isCompactionSummary}`,
       );
 
       return {
-        contextWindow: await getContextWindow(),
-        actualInputTokens: lastAssistantMessage?.inputTokens ?? null,
-        actualOutputTokens: lastAssistantMessage?.outputTokens ?? null,
-        actualCachedInputTokens: lastAssistantMessage?.cachedInputTokens ?? null,
+        contextWindow,
+        actualInputTokens: lastMessageWithTokens?.inputTokens ?? null,
+        actualOutputTokens: lastMessageWithTokens?.outputTokens ?? null,
+        actualCachedInputTokens: lastMessageWithTokens?.cachedInputTokens ?? null,
       };
     },
   );

@@ -32,6 +32,12 @@ import { useLoadApp } from "@/hooks/useLoadApp";
 import { HistoryNavigation, HISTORY_TRIGGER } from "./HistoryNavigation";
 import { slugForPrompt } from "@/ipc/utils/replaceSlashSkillReference";
 
+const BUILTIN_SLASH_COMMANDS = [
+  { value: "new", argumentHint: "Start a new chat" },
+  { value: "compact", argumentHint: "Compact chat history to free up context" },
+  { value: "init", argumentHint: "Generate AI_RULES.md for this project" },
+];
+
 // Define the theme for mentions
 const beautifulMentionsTheme: BeautifulMentionsTheme = {
   "@": "px-2 py-0.5 mx-0.5 bg-accent text-accent-foreground rounded-md",
@@ -47,21 +53,24 @@ const CustomMenuItem = forwardRef<
 >(({ selected, item, ...props }, ref) => {
   const isPrompt = item.data?.type === "prompt";
   const isSkill = item.data?.type === "skill";
+  const isBuiltin = item.data?.type === "builtin";
   const isApp = item.data?.type === "app";
   const isHistory = item.data?.type === "history";
   const isMedia = item.data?.type === "media";
   const isFileSkill = isSkill && item.data?.source === "global";
-  const label = isSkill
-    ? "Skill"
-    : isPrompt
-      ? "Prompt"
-      : isApp
-        ? "App"
-        : isHistory
-          ? ""
-          : isMedia
-            ? "Media"
-            : "File";
+  const label = isBuiltin
+    ? "Built-in"
+    : isSkill
+      ? "Skill"
+      : isPrompt
+        ? "Prompt"
+        : isApp
+          ? "App"
+          : isHistory
+            ? ""
+            : isMedia
+              ? "Media"
+              : "File";
   const value = (item as any)?.value;
   const argumentHint: string | null = item.data?.argumentHint ?? null;
 
@@ -95,17 +104,24 @@ const CustomMenuItem = forwardRef<
       <div className="flex items-center space-x-2 min-w-0">
         <span
           className={`px-2 py-0.5 text-xs font-medium rounded-md flex-shrink-0 ${
-            isSkill || isPrompt
-              ? "bg-purple-500 text-white"
-              : isApp
-                ? "bg-primary text-primary-foreground"
-                : isMedia
-                  ? "bg-amber-500 text-white"
-                  : "bg-blue-600 text-white"
+            isBuiltin
+              ? "bg-green-600 text-white"
+              : isSkill || isPrompt
+                ? "bg-purple-500 text-white"
+                : isApp
+                  ? "bg-primary text-primary-foreground"
+                  : isMedia
+                    ? "bg-amber-500 text-white"
+                    : "bg-blue-600 text-white"
           }`}
         >
           {label}
         </span>
+        {isBuiltin && (
+          <span className="px-1.5 py-0.5 text-xs rounded border border-border text-muted-foreground flex-shrink-0">
+            cmd
+          </span>
+        )}
         {isFileSkill && (
           <span className="px-1.5 py-0.5 text-xs rounded border border-border text-muted-foreground flex-shrink-0">
             file
@@ -309,6 +325,7 @@ interface LexicalChatInputProps {
   messageHistory: string[];
   excludeCurrentApp: boolean;
   disableSendButton: boolean;
+  showBuiltinCommands?: boolean;
 }
 
 function onError(error: Error) {
@@ -325,6 +342,7 @@ export function LexicalChatInput({
   disabled = false,
   disableSendButton,
   messageHistory = [],
+  showBuiltinCommands = true,
 }: LexicalChatInputProps) {
   const { apps } = useLoadApps();
   const { prompts } = usePrompts();
@@ -355,6 +373,15 @@ export function LexicalChatInput({
       }));
     result[HISTORY_TRIGGER] = historyItems;
 
+    // Built-in slash commands (shown first, only in chat context)
+    const builtinItems = showBuiltinCommands
+      ? BUILTIN_SLASH_COMMANDS.map((cmd) => ({
+          value: cmd.value,
+          type: "builtin",
+          argumentHint: cmd.argumentHint,
+        }))
+      : [];
+
     // Skills (slash commands): DB prompts-with-slug + global file skills
     const skillItems = (skills || [])
       .filter((s) => s.userInvocable !== false)
@@ -364,7 +391,7 @@ export function LexicalChatInput({
         source: s.source,
         argumentHint: s.argumentHint,
       }));
-    result["/"] = skillItems;
+    result["/"] = [...builtinItems, ...skillItems];
 
     if (!apps) return result;
 
@@ -428,6 +455,7 @@ export function LexicalChatInput({
     appFiles,
     messageHistory,
     mediaApps,
+    showBuiltinCommands,
   ]);
 
   const initialConfig = {

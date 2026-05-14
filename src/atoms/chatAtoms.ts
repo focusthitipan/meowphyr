@@ -3,6 +3,7 @@ import type {
   Message,
   AgentTodo,
   ComponentSelection,
+  TokenCountResult,
 } from "@/ipc/types";
 import type { ListedApp } from "@/ipc/types/app";
 import type { Getter, Setter } from "jotai";
@@ -263,3 +264,8 @@ export const streamCompletedSuccessfullyByIdAtom = atom<Map<number, boolean>>(
 
 // Tracks if the queue is paused for each chat (Map<chatId, isPaused>)
 export const queuePausedByIdAtom = atom<Map<number, boolean>>(new Map());
+
+// Realtime token counts updated per-step during streaming (Map<chatId, TokenCountResult>)
+export const streamingTokensByChatIdAtom = atom<Map<number, TokenCountResult>>(
+  new Map(),
+);

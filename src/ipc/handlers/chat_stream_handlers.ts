@@ -57,7 +57,7 @@ import fs from "node:fs";
 import * as path from "path";
 import * as crypto from "crypto";
 import { readFile, writeFile } from "fs/promises";
-import { getMaxTokens, getTemperature } from "../utils/token_utils";
+import { getMaxTokens, getTemperature, getContextWindow } from "../utils/token_utils";
 import { MAX_CHAT_TURNS_IN_CONTEXT } from "@/constants/settings_constants";
 import { validateChatContext } from "../utils/context_paths_utils";
 import { getProviderOptions, getAiHeaders } from "../utils/provider_options";
@@ -315,6 +315,74 @@ export function registerChatStreamHandlers() {
         if (reloadedChat) {
           Object.assign(chat, reloadedChat);
         }
+      }
+
+      // Handle manual /compact command — stream the compaction and return early
+      if (req.triggerManualCompaction) {
+        const appPath = getDyadAppPath(chat.app.path);
+        const compactionRequestId = uuidv4();
+
+        // Create a placeholder assistant message so the frontend sees the stream
+        const [placeholder] = await db
+          .insert(messages)
+          .values({
+            chatId: req.chatId,
+            role: "assistant",
+            content:
+              '<dyad-status state="in-progress">Compacting conversation…</dyad-status>',
+          })
+          .returning();
+
+        // Send initial messages (including placeholder) to the frontend
+        const initialMessages = await db.query.messages.findMany({
+          where: eq(messages.chatId, req.chatId),
+          orderBy: (m, { asc }) => [asc(m.createdAt)],
+        });
+        safeSend(event.sender, "chat:response:chunk", {
+          chatId: req.chatId,
+          messages: initialMessages.map((m) => ({
+            ...m,
+            role: m.role as "user" | "assistant",
+          })),
+        });
+
+        // Stream compaction summary chunks into the placeholder message
+        await performCompaction(
+          event,
+          req.chatId,
+          appPath,
+          compactionRequestId,
+          (accumulatedText) => {
+            safeSend(event.sender, "chat:response:chunk", {
+              chatId: req.chatId,
+              streamingMessageId: placeholder.id,
+              streamingContent: `<dyad-compaction title="Compacting conversation…" state="in-progress">\n${accumulatedText}\n</dyad-compaction>`,
+            });
+          },
+          { createdAtStrategy: "now" },
+        );
+
+        // Delete the placeholder — performCompaction inserted its own summary message
+        await db.delete(messages).where(eq(messages.id, placeholder.id));
+
+        // Send final messages to the frontend
+        const finalMessages = await db.query.messages.findMany({
+          where: eq(messages.chatId, req.chatId),
+          orderBy: (m, { asc }) => [asc(m.createdAt)],
+        });
+        safeSend(event.sender, "chat:response:chunk", {
+          chatId: req.chatId,
+          messages: finalMessages.map((m) => ({
+            ...m,
+            role: m.role as "user" | "assistant",
+          })),
+        });
+
+        safeSend(event.sender, "chat:response:end", {
+          chatId: req.chatId,
+          updatedFiles: false,
+        } satisfies ChatResponseEnd);
+        return;
       }
 
       // Handle redo option: remove the most recent messages if needed
@@ -1235,6 +1303,17 @@ This conversation includes one or more image attachments. When the user uploads 
                 logger.log(
                   `Input tokens: ${stepInputTokens}, output: ${stepOutputTokens}, cached: ${stepCachedInputTokens}`,
                 );
+
+                // Send realtime token update to renderer so TokenBar updates per-step
+                safeSend(event.sender, "chat:response:chunk", {
+                  chatId: req.chatId,
+                  tokenUpdate: {
+                    contextWindow: await getContextWindow(),
+                    actualInputTokens: stepInputTokens,
+                    actualOutputTokens: stepOutputTokens ?? null,
+                    actualCachedInputTokens: stepCachedInputTokens ?? null,
+                  },
+                });
 
                 // Mark chat for compaction if near context limit (checked per step
                 // so multi-step MCP tool chains don't blow past the threshold)

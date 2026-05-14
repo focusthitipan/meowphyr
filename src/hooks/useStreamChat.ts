@@ -14,6 +14,7 @@ import {
   queuedMessagesByIdAtom,
   streamCompletedSuccessfullyByIdAtom,
   queuePausedByIdAtom,
+  streamingTokensByChatIdAtom,
   type QueuedMessageItem,
 } from "@/atoms/chatAtoms";
 import { ipc } from "@/ipc/types";
@@ -59,6 +60,7 @@ export function useStreamChat({
   const { refreshApp } = useLoadApp(selectedAppId);
 
   const setStreamCountById = useSetAtom(chatStreamCountByIdAtom);
+  const setStreamingTokensById = useSetAtom(streamingTokensByChatIdAtom);
   const { refreshVersions } = useVersions(selectedAppId);
   const { refreshAppIframe } = useRunApp();
   const setPendingScreenshotAppId = useSetAtom(pendingScreenshotAppIdAtom);
@@ -92,6 +94,7 @@ export function useStreamChat({
       attachments,
       selectedComponents,
       requestedChatMode,
+      triggerManualCompaction,
       onSettled,
     }: {
       prompt: string;
@@ -101,13 +104,16 @@ export function useStreamChat({
       attachments?: FileAttachment[];
       selectedComponents?: ComponentSelection[];
       requestedChatMode?: Chat["chatMode"] | null;
+      triggerManualCompaction?: boolean;
       onSettled?: (result: {
         success: boolean;
         pausedByStepLimit?: boolean;
       }) => void;
     }) => {
       if (
-        (!prompt.trim() && (!attachments || attachments.length === 0)) ||
+        (!prompt.trim() &&
+          !triggerManualCompaction &&
+          (!attachments || attachments.length === 0)) ||
         !chatId
       ) {
         return;
@@ -241,6 +247,7 @@ export function useStreamChat({
               requestedChatMode === null
                 ? undefined
                 : (requestedChatMode ?? cachedChat?.chatMode ?? undefined),
+            triggerManualCompaction,
           },
           {
             onChunk: ({
@@ -249,9 +256,18 @@ export function useStreamChat({
               streamingContent,
               effectiveChatMode,
               chatModeFallbackReason,
+              tokenUpdate,
             }) => {
               lastActivityTime = Date.now();
               if (isPostEnd) postEndChunkCount++;
+
+              if (tokenUpdate) {
+                setStreamingTokensById((prev) => {
+                  const next = new Map(prev);
+                  next.set(chatId, tokenUpdate);
+                  return next;
+                });
+              }
               if (
                 handleEffectiveChatModeChunk(
                   { effectiveChatMode, chatModeFallbackReason },
@@ -307,6 +323,11 @@ export function useStreamChat({
               clearInterval(watchdogTimer);
               pendingStreamChatIds.delete(chatId);
               isPostEnd = true;
+              setStreamingTokensById((prev) => {
+                const next = new Map(prev);
+                next.delete(chatId);
+                return next;
+              });
               void (async () => {
                 // Only mark as successful if NOT cancelled - wasCancelled flag is set
                 // by the backend when user cancels the stream
@@ -471,6 +492,11 @@ export function useStreamChat({
             onError: ({ error: errorMessage, warningMessages }) => {
               // Remove from pending set now that stream ended with error
               pendingStreamChatIds.delete(chatId);
+              setStreamingTokensById((prev) => {
+                const next = new Map(prev);
+                next.delete(chatId);
+                return next;
+              });
 
               for (const warningMessage of warningMessages ?? []) {
                 showWarning(warningMessage);

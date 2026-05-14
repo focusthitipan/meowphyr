@@ -41,6 +41,26 @@ export function getMidTurnCompactionSummaryIds<
   const hiddenIds = new Set<number>();
 
   for (const summary of messages.filter((m) => m.isCompactionSummary)) {
+    // If a user message exists after this summary, a new turn has already started —
+    // the compaction is between-turn (manual /compact or auto between-turn). Always show.
+    const hasUserMessageAfterSummary = messages.some(
+      (m) => m.role === "user" && m.id > summary.id,
+    );
+    if (hasUserMessageAfterSummary) {
+      continue;
+    }
+
+    // No user message after the summary and no subsequent assistant message either —
+    // this is a terminal manual /compact. Always show.
+    const hasAssistantMessageAfterSummary = messages.some(
+      (m) => m.role === "assistant" && !m.isCompactionSummary && m.id > summary.id,
+    );
+    if (!hasAssistantMessageAfterSummary) {
+      continue;
+    }
+
+    // Has a subsequent assistant message but no subsequent user message:
+    // this is a mid-turn auto compaction. Apply the timestamp guard.
     const triggeringUserMessage = [...messages]
       .filter((m) => m.role === "user" && m.id < summary.id)
       .sort((a, b) => b.id - a.id)[0];

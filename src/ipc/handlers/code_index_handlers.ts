@@ -11,6 +11,8 @@ import log from "electron-log";
 
 const logger = log.scope("code_index_handlers");
 
+const activeIndexRuns = new Set<number>();
+
 function sendProgress(payload: IndexProgressPayload) {
   const windows = BrowserWindow.getAllWindows();
   if (windows.length > 0) {
@@ -31,8 +33,14 @@ export function registerCodeIndexHandlers() {
         throw new DyadError("App not found", DyadErrorKind.NotFound);
       }
 
+      if (activeIndexRuns.has(appId)) {
+        logger.warn(`Index already running for app ${appId}, ignoring duplicate request`);
+        throw new DyadError("Indexing already in progress for this app", DyadErrorKind.Validation);
+      }
+
       const appPath = getDyadAppPath(app.path);
       logger.log(`Manual index triggered for app ${appId}`);
+      activeIndexRuns.add(appId);
 
       try {
         const progress = await indexCodebase(appId, appPath, (p) => {
@@ -53,6 +61,7 @@ export function registerCodeIndexHandlers() {
 
         return progress;
       } catch (err) {
+        logger.error(`Indexing failed for app ${appId}:`, err);
         sendProgress({
           appId,
           indexed: 0,
@@ -61,6 +70,8 @@ export function registerCodeIndexHandlers() {
           error: err instanceof Error ? err.message : String(err),
         });
         throw err;
+      } finally {
+        activeIndexRuns.delete(appId);
       }
     },
   );

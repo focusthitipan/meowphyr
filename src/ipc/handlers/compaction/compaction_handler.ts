@@ -236,6 +236,9 @@ export async function performCompaction(
       onSummaryChunk?.(summary);
     }
 
+    // Get actual token usage from the compaction API call
+    const compactionUsage = await summaryResult.usage;
+
     // Create the compaction indicator message
     // Include relative backup path so the AI can read the full original conversation later
     const compactionMessageContent = `<dyad-compaction title="Conversation compacted" state="finished">
@@ -272,6 +275,9 @@ Note: This file may be large. Read only the sections you need or use grep to sea
       content: compactionMessageContent,
       isCompactionSummary: true,
       createdAt: compactionCreatedAt,
+      inputTokens: compactionUsage.inputTokens ?? null,
+      outputTokens: compactionUsage.outputTokens ?? null,
+      cachedInputTokens: compactionUsage.cachedInputTokens ?? null,
     });
 
     // Update chat record — reset failure count on success

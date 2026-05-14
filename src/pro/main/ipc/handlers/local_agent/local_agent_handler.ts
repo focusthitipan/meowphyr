@@ -29,7 +29,7 @@ import { detectFrameworkType } from "@/ipc/utils/framework_utils";
 import { getModelClient } from "@/ipc/utils/get_model_client";
 import { safeSend } from "@/ipc/utils/safe_sender";
 import { cancelOrphanedBaseStream } from "@/ipc/utils/stream_text_utils";
-import { getMaxTokens, getTemperature } from "@/ipc/utils/token_utils";
+import { getMaxTokens, getTemperature, getContextWindow } from "@/ipc/utils/token_utils";
 import {
   getProviderOptions,
   getAiHeaders,
@@ -1532,6 +1532,36 @@ export async function handleLocalAgentStream(
                     `Injected synthetic planning_questionnaire reflection message for chat ${req.chatId}`,
                   );
                 }
+              }
+
+              // Update DB and send realtime token update per step
+              if (typeof step.usage.inputTokens === "number") {
+                const stepInputTokens = step.usage.inputTokens;
+                const stepOutputTokens = step.usage.outputTokens ?? null;
+                const stepCachedInputTokens = step.usage.cachedInputTokens ?? null;
+
+                await db
+                  .update(messages)
+                  .set({
+                    maxTokensUsed: stepInputTokens + (stepCachedInputTokens ?? 0),
+                    inputTokens: stepInputTokens,
+                    outputTokens: stepOutputTokens,
+                    cachedInputTokens: stepCachedInputTokens,
+                  })
+                  .where(eq(messages.id, placeholderMessageId))
+                  .catch((err) =>
+                    logger.error("Failed to save token count per step", err),
+                  );
+
+                safeSend(event.sender, "chat:response:chunk", {
+                  chatId: req.chatId,
+                  tokenUpdate: {
+                    contextWindow: await getContextWindow(),
+                    actualInputTokens: stepInputTokens,
+                    actualOutputTokens: stepOutputTokens,
+                    actualCachedInputTokens: stepCachedInputTokens,
+                  },
+                });
               }
 
               if (

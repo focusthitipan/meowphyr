@@ -153,26 +153,6 @@ async function execOrThrow(
   }
 }
 
-/**
- * Prepends git config args for user.name and user.email to the provided args.
- * Automatically fetches the git author from settings.
- * Usage: await withGitAuthor(["commit", "-m", "message"])
- * Returns: ["-c", "user.name=...", "-c", "user.email=...", "commit", "-m", "message"]
- *
- * Do NOT do "--author" because this does not set the committer identity.
- *
- * Doing -c user.name/email sets both the committer and author identity.
- */
-export async function withGitAuthor(args: string[]): Promise<string[]> {
-  const author = await getGitAuthor();
-  return [
-    "-c",
-    `user.name=${author.name}`,
-    "-c",
-    `user.email=${author.email}`,
-    ...args,
-  ];
-}
 
 /**
  * Adds a directory to git's global safe.directory list.
@@ -303,11 +283,10 @@ export async function gitCommit({
   const settings = readSettings();
   if (settings.enableNativeGit) {
     // Perform the commit using dugite with -c user.name/email config
-    const commitArgs = ["commit", "-m", message];
+    const args = ["commit", "-m", message];
     if (amend) {
-      commitArgs.push("--amend");
+      args.push("--amend");
     }
-    const args = await withGitAuthor(commitArgs);
     await execOrThrow(args, path, "Failed to create commit");
     // Get the new commit hash
     const result = await execGit(["rev-parse", "HEAD"], path);
@@ -1123,9 +1102,7 @@ export async function gitRebaseContinue({
     );
   }
 
-  // Use withGitAuthor since rebase --continue needs to create commits
-  // and requires user.name and user.email
-  const args = await withGitAuthor(["rebase", "--continue"]);
+  const args = ["rebase", "--continue"];
   await execOrThrow(
     args,
     path,
@@ -1148,9 +1125,7 @@ export async function gitRebase({
     );
   }
 
-  // Use withGitAuthor since rebase replays commits and needs user.name and user.email
-  // to set the committer identity on the rebased commits
-  const args = await withGitAuthor(["rebase", `origin/${branch}`]);
+  const args = ["rebase", `origin/${branch}`];
   await execOrThrow(
     args,
     path,
@@ -1410,16 +1385,7 @@ export async function gitPull({
 }: GitPullParams): Promise<void> {
   const settings = readSettings();
   if (settings.enableNativeGit) {
-    // Use withGitAuthor since pull may need to create merge commits
-    // and requires user.name and user.email
-    const pullArgs = await withGitAuthor([
-      "-c",
-      "credential.helper=",
-      "pull",
-      "--rebase=false",
-      remote,
-      branch,
-    ]);
+    const pullArgs = ["-c", "credential.helper=", "pull", "--rebase=false", remote, branch];
     try {
       await execOrThrow(pullArgs, path, "Failed to pull from remote");
     } catch (error: any) {
@@ -1473,9 +1439,7 @@ export async function gitMerge({
 }: GitMergeParams): Promise<void> {
   const settings = readSettings();
   if (settings.enableNativeGit) {
-    // Use withGitAuthor since merge may need to create merge commits
-    // and requires user.name and user.email
-    const args = await withGitAuthor(["merge", branch]);
+    const args = ["merge", branch];
     try {
       await execOrThrow(args, path, `Failed to merge branch ${branch}`);
     } catch (error: any) {

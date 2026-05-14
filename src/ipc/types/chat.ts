@@ -98,6 +98,7 @@ export const ChatStreamParamsSchema = z.object({
   attachments: z.array(ChatAttachmentSchema).optional(),
   selectedComponents: z.array(ComponentSelectionSchema).optional(),
   requestedChatMode: ChatModeSchema.optional(),
+  triggerManualCompaction: z.boolean().optional(),
 });
 
 export type ChatStreamParams = z.infer<typeof ChatStreamParamsSchema>;
@@ -119,6 +120,14 @@ export const ChatResponseChunkSchema = z.object({
   effectiveChatMode: ChatModeSchema.optional(),
   chatModeFallbackReason: z
     .enum(["pro-required", "quota-exhausted", "no-provider"])
+    .optional(),
+  tokenUpdate: z
+    .object({
+      contextWindow: z.number(),
+      actualInputTokens: z.number().nullable(),
+      actualOutputTokens: z.number().nullable(),
+      actualCachedInputTokens: z.number().nullable(),
+    })
     .optional(),
 });
 

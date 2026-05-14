@@ -199,6 +199,7 @@ export function HomeChatInput({
               excludeCurrentApp={false}
               disableSendButton={false}
               messageHistory={[]}
+              showBuiltinCommands={false}
             />
 
             {/* Voice-to-text button */}

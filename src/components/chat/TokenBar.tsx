@@ -7,8 +7,8 @@ import {
 } from "@/components/ui/tooltip";
 import { useCountTokens } from "@/hooks/useCountTokens";
 import { ArrowDown, ArrowUp, Zap } from "lucide-react";
-import { chatInputValueAtom } from "@/atoms/chatAtoms";
-import { useAtom } from "jotai";
+import { chatInputValueAtom, streamingTokensByChatIdAtom } from "@/atoms/chatAtoms";
+import { useAtom, useAtomValue } from "jotai";
 
 interface TokenBarProps {
   chatId?: number;
@@ -16,7 +16,15 @@ interface TokenBarProps {
 
 export function TokenBar({ chatId }: TokenBarProps) {
   const [inputValue] = useAtom(chatInputValueAtom);
-  const { result, error } = useCountTokens(chatId ?? null, inputValue);
+  const streamingTokensById = useAtomValue(streamingTokensByChatIdAtom);
+  const streamingTokens = chatId ? streamingTokensById.get(chatId) : undefined;
+  // While streaming, use realtime token data from the atom; otherwise use DB-backed IPC call
+  const { result: dbResult, error } = useCountTokens(
+    streamingTokens ? null : (chatId ?? null),
+    inputValue,
+  );
+  const result = streamingTokens ?? dbResult;
+
   if (!chatId || !result) {
     return null;
   }
@@ -24,14 +32,11 @@ export function TokenBar({ chatId }: TokenBarProps) {
   const { actualInputTokens, actualOutputTokens, actualCachedInputTokens, contextWindow } =
     result;
 
-  // Only show when we have real API-reported token data.
-  if (actualInputTokens === null) {
-    return null;
-  }
+  const hasTokenData = actualInputTokens !== null;
 
   // For Anthropic/DeepSeek: inputTokens = non-cached only, cachedTokens = cache hits.
   // Total context usage = inputTokens + cachedTokens.
-  const nonCachedInputTokens = actualInputTokens;
+  const nonCachedInputTokens = actualInputTokens ?? 0;
   const outputTokens = actualOutputTokens ?? 0;
   const cachedTokens = actualCachedInputTokens ?? 0;
   const totalInputTokens = nonCachedInputTokens + cachedTokens;
@@ -48,8 +53,14 @@ export function TokenBar({ chatId }: TokenBarProps) {
           <TooltipTrigger className="w-full">
             <div className="w-full">
               <div className="flex gap-3 mb-1 text-xs text-muted-foreground">
-                <span>Tokens: {totalInputTokens.toLocaleString()}</span>
-                <span>{Math.round(percentUsed)}%</span>
+                {hasTokenData ? (
+                  <>
+                    <span>Tokens: {totalInputTokens.toLocaleString()}</span>
+                    <span>{Math.round(percentUsed)}%</span>
+                  </>
+                ) : (
+                  <span className="italic">No token data</span>
+                )}
                 <span>
                   Context window: {(contextWindow / 1000).toFixed(0)}K
                 </span>
@@ -76,19 +87,25 @@ export function TokenBar({ chatId }: TokenBarProps) {
           <TooltipContent side="top" className="w-56 p-2">
             <div className="space-y-1">
               <div className="font-medium mb-2">Token Usage (from API)</div>
-              <div className="grid grid-cols-[16px_1fr_auto] gap-x-2 items-center gap-y-1">
-                <ArrowUp size={12} className="text-blue-400" />
-                <span>Input</span>
-                <span>{nonCachedInputTokens.toLocaleString()}</span>
+              {hasTokenData ? (
+                <div className="grid grid-cols-[16px_1fr_auto] gap-x-2 items-center gap-y-1">
+                  <ArrowUp size={12} className="text-blue-400" />
+                  <span>Input</span>
+                  <span>{nonCachedInputTokens.toLocaleString()}</span>
 
-                <ArrowDown size={12} className="text-purple-400" />
-                <span>Output</span>
-                <span>{outputTokens.toLocaleString()}</span>
+                  <ArrowDown size={12} className="text-purple-400" />
+                  <span>Output</span>
+                  <span>{outputTokens.toLocaleString()}</span>
 
-                <Zap size={12} className="text-green-400" />
-                <span>Cached</span>
-                <span>{cachedTokens.toLocaleString()}</span>
-              </div>
+                  <Zap size={12} className="text-green-400" />
+                  <span>Cached</span>
+                  <span>{cachedTokens.toLocaleString()}</span>
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-xs">
+                  Token data will appear after the next response completes.
+                </p>
+              )}
               <div className="pt-1 border-t border-border">
                 <div className="flex justify-between font-medium">
                   <span>Context window</span>

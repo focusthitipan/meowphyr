@@ -63,6 +63,8 @@ export async function indexCodebase(
 
     if (flatChunks.length === 0) continue;
 
+    logger.log(`File batch ${Math.floor(i / FILE_BATCH_SIZE) + 1}: embedding ${flatChunks.length} chunks from ${batch.length} files`);
+
     // Embed all chunks at once
     const embeddings = await getEmbeddings(flatChunks.map((c) => c.chunk.text));
 
@@ -84,6 +86,7 @@ export async function indexCodebase(
       progress.indexed++;
       onProgress?.(progress);
     }
+    logger.log(`File batch ${Math.floor(i / FILE_BATCH_SIZE) + 1} done, total indexed so far: ${progress.indexed}`);
   }
 
   logger.log(

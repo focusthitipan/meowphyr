@@ -1,15 +1,12 @@
-import { getGithubUser } from "../handlers/github_handlers";
+import { exec } from "dugite";
 
 export async function getGitAuthor() {
-  const user = await getGithubUser();
-  const author = user
-    ? {
-        name: `[dyad]`,
-        email: user.email,
-      }
-    : {
-        name: "[dyad]",
-        email: "git@dyad.sh",
-      };
-  return author;
+  const [nameResult, emailResult] = await Promise.all([
+    exec(["config", "--global", "user.name"], process.cwd()),
+    exec(["config", "--global", "user.email"], process.cwd()),
+  ]);
+  return {
+    name: nameResult.stdout.trim() || "Unknown",
+    email: emailResult.stdout.trim() || "unknown@unknown.com",
+  };
 }
