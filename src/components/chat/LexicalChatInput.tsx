@@ -36,6 +36,7 @@ const BUILTIN_SLASH_COMMANDS = [
   { value: "new", argumentHint: "Start a new chat" },
   { value: "compact", argumentHint: "Compact chat history to free up context" },
   { value: "init", argumentHint: "Generate AI_RULES.md for this project" },
+  { value: "create-skill", argumentHint: "Let AI draft and save a new skill" },
 ];
 
 // Define the theme for mentions
@@ -58,8 +59,9 @@ const CustomMenuItem = forwardRef<
   const isHistory = item.data?.type === "history";
   const isMedia = item.data?.type === "media";
   const isFileSkill = isSkill && item.data?.source === "global";
+  const isProjectSkill = isSkill && item.data?.source === "project";
   const label = isBuiltin
-    ? "Built-in"
+    ? "System"
     : isSkill
       ? "Skill"
       : isPrompt
@@ -124,7 +126,12 @@ const CustomMenuItem = forwardRef<
         )}
         {isFileSkill && (
           <span className="px-1.5 py-0.5 text-xs rounded border border-border text-muted-foreground flex-shrink-0">
-            file
+            global
+          </span>
+        )}
+        {isProjectSkill && (
+          <span className="px-1.5 py-0.5 text-xs rounded border border-border text-muted-foreground flex-shrink-0">
+            project
           </span>
         )}
         <div className="flex flex-col min-w-0">
@@ -346,11 +353,11 @@ export function LexicalChatInput({
 }: LexicalChatInputProps) {
   const { apps } = useLoadApps();
   const { prompts } = usePrompts();
-  const { skills } = useSkills();
   const { mediaApps } = useAppMediaFiles();
   const [shouldClear, setShouldClear] = useState(false);
   const historyTriggerActiveRef = useRef(false);
   const selectedAppId = useAtomValue(selectedAppIdAtom);
+  const { skills } = useSkills(selectedAppId ?? undefined);
   const { app } = useLoadApp(selectedAppId);
   const appFiles = app?.files;
 

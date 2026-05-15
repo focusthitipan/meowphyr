@@ -1,6 +1,7 @@
 ﻿import React, { useDeferredValue, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkBreaks from "remark-breaks";
 
 import { DyadWrite } from "./DyadWrite";
 import { DyadRename } from "./DyadRename";
@@ -137,7 +138,7 @@ const customLink = ({
 export const VanillaMarkdownParser = ({ content }: { content: string }) => {
   return (
     <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
+      remarkPlugins={[remarkGfm, remarkBreaks]}
       components={{
         code: CodeHighlight,
         a: customLink,

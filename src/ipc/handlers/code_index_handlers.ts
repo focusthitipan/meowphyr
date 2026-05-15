@@ -8,6 +8,7 @@ import { getDyadAppPath } from "../../paths/paths";
 import { DyadError, DyadErrorKind } from "@/errors/dyad_error";
 import { BrowserWindow } from "electron";
 import log from "electron-log";
+import { startWatching, stopWatching } from "../../pro/main/ipc/handlers/local_agent/indexing/file_watcher";
 
 const logger = log.scope("code_index_handlers");
 
@@ -20,7 +21,47 @@ function sendProgress(payload: IndexProgressPayload) {
   }
 }
 
+async function restoreWatchers(reindexFn: (appId: number, appPath: string) => Promise<void>) {
+  const { getIndexedAppIds } = await import(
+    "../../pro/main/ipc/handlers/local_agent/indexing/vector_store"
+  );
+  const appIds = getIndexedAppIds();
+  if (appIds.length === 0) return;
+
+  const indexedApps = await db.query.apps.findMany({
+    where: (apps, { inArray }) => inArray(apps.id, appIds),
+    columns: { id: true, path: true },
+  });
+
+  for (const app of indexedApps) {
+    const appPath = getDyadAppPath(app.path);
+    startWatching(app.id, appPath, reindexFn);
+    logger.log(`Restored file watcher for app ${app.id}`);
+  }
+}
+
 export function registerCodeIndexHandlers() {
+  const reindexFn = async (appId: number, appPath: string) => {
+    const { indexCodebase } = await import(
+      "../../pro/main/ipc/handlers/local_agent/indexing/codebase_indexer"
+    );
+    if (activeIndexRuns.has(appId)) return;
+    activeIndexRuns.add(appId);
+    try {
+      const progress = await indexCodebase(appId, appPath);
+      sendProgress({ appId, indexed: progress.indexed, total: progress.total, state: "complete" });
+    } catch (err) {
+      logger.error(`Auto re-index failed for app ${appId}:`, err);
+      sendProgress({ appId, indexed: 0, total: 0, state: "error", error: String(err) });
+    } finally {
+      activeIndexRuns.delete(appId);
+    }
+  };
+
+  restoreWatchers(reindexFn).catch((err) =>
+    logger.error("Failed to restore file watchers:", err),
+  );
+
   createTypedHandler(
     codeIndexContracts.indexCodebase,
     async (_, { appId }) => {
@@ -59,6 +100,8 @@ export function registerCodeIndexHandlers() {
           state: "complete",
         });
 
+        startWatching(appId, appPath, reindexFn);
+
         return progress;
       } catch (err) {
         logger.error(`Indexing failed for app ${appId}:`, err);
@@ -93,6 +136,7 @@ export function registerCodeIndexHandlers() {
         "../../pro/main/ipc/handlers/local_agent/indexing/vector_store"
       );
       clearIndex(appId);
+      stopWatching(appId);
       logger.log(`Index cleared for app ${appId}`);
       return { success: true };
     },

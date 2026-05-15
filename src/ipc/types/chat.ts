@@ -99,6 +99,7 @@ export const ChatStreamParamsSchema = z.object({
   selectedComponents: z.array(ComponentSelectionSchema).optional(),
   requestedChatMode: ChatModeSchema.optional(),
   triggerManualCompaction: z.boolean().optional(),
+  triggerCreateSkill: z.string().optional(),
 });
 
 export type ChatStreamParams = z.infer<typeof ChatStreamParamsSchema>;

@@ -210,7 +210,8 @@ export const queryKeys = {
   // Skills (unified: DB prompts-with-slug + global file skills)
   // ─────────────────────────────────────────────────────────────────────────────
   skills: {
-    all: ["skills"] as const,
+    all: () => ["skills"] as const,
+    list: (appId?: number) => ["skills", appId] as const,
   },
 
   // ─────────────────────────────────────────────────────────────────────────────

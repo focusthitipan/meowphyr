@@ -1,18 +1,14 @@
 import { useAtomValue } from "jotai";
 import { selectedAppIdAtom } from "../../atoms/appAtoms";
 import { useSkills } from "@/hooks/useSkills";
-import { useLoadApp } from "@/hooks/useLoadApp";
 import { Globe, FolderCode, Zap } from "lucide-react";
 
 export function SkillsPanel() {
   const selectedAppId = useAtomValue(selectedAppIdAtom);
-  const { app } = useLoadApp(selectedAppId);
-  const { skills, isLoading } = useSkills();
+  const { skills, isLoading } = useSkills(selectedAppId ?? undefined);
 
   const globalSkills = skills.filter((s) => s.source === "global" || s.source === "db");
-  const projectSkills = skills.filter(
-    (s) => s.source === "project" && s.appName === app?.name,
-  );
+  const projectSkills = skills.filter((s) => s.source === "project");
 
   if (isLoading) {
     return (

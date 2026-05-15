@@ -49,7 +49,7 @@ export function chunkFile(content: string, filePath: string): Chunk[] {
   return chunks;
 }
 
-const EXTENSIONS = new Set([
+export const EXTENSIONS = new Set([
   ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs",
   ".py", ".rb", ".go", ".rs", ".java", ".kt", ".swift",
   ".c", ".cpp", ".h", ".hpp", ".cs",
@@ -61,7 +61,7 @@ const EXTENSIONS = new Set([
   ".sh", ".bash", ".zsh",
 ]);
 
-const SKIP_DIRS = new Set([
+export const SKIP_DIRS = new Set([
   "node_modules", ".git", "dist", "build", ".next", ".nuxt",
   "out", "coverage", ".cache", ".meowphyr", "__pycache__", ".venv",
   "venv", "target", "vendor",

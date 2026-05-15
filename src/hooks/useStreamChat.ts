@@ -95,6 +95,7 @@ export function useStreamChat({
       selectedComponents,
       requestedChatMode,
       triggerManualCompaction,
+      triggerCreateSkill,
       onSettled,
     }: {
       prompt: string;
@@ -105,6 +106,7 @@ export function useStreamChat({
       selectedComponents?: ComponentSelection[];
       requestedChatMode?: Chat["chatMode"] | null;
       triggerManualCompaction?: boolean;
+      triggerCreateSkill?: string;
       onSettled?: (result: {
         success: boolean;
         pausedByStepLimit?: boolean;
@@ -113,6 +115,7 @@ export function useStreamChat({
       if (
         (!prompt.trim() &&
           !triggerManualCompaction &&
+          !triggerCreateSkill &&
           (!attachments || attachments.length === 0)) ||
         !chatId
       ) {
@@ -248,6 +251,7 @@ export function useStreamChat({
                 ? undefined
                 : (requestedChatMode ?? cachedChat?.chatMode ?? undefined),
             triggerManualCompaction,
+            triggerCreateSkill,
           },
           {
             onChunk: ({
@@ -323,6 +327,9 @@ export function useStreamChat({
               clearInterval(watchdogTimer);
               pendingStreamChatIds.delete(chatId);
               isPostEnd = true;
+              if (triggerCreateSkill !== undefined) {
+                queryClient.invalidateQueries({ queryKey: queryKeys.skills.all() });
+              }
               setStreamingTokensById((prev) => {
                 const next = new Map(prev);
                 next.delete(chatId);

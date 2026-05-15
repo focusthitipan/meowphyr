@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import log from "electron-log";
 import { scanFiles, chunkFile, type Chunk } from "./chunker";
 import { getEmbeddings } from "./embeddings";
-import { getFileHash, upsertChunks, getChunkCount } from "./vector_store";
+import { getFileHash, upsertChunks, getChunkCount, getIndexedFilePaths, deleteFile } from "./vector_store";
 
 const logger = log.scope("codebase_indexer");
 
@@ -35,6 +35,16 @@ export async function indexCodebase(
 
   const files = await scanFiles(appPath);
   const progress: IndexProgress = { indexed: 0, total: files.length, skipped: 0 };
+
+  // Remove DB entries for files that no longer exist on disk
+  const scannedPaths = new Set(files.map((f) => f.filePath));
+  const indexedPaths = getIndexedFilePaths(appId);
+  for (const filePath of indexedPaths) {
+    if (!scannedPaths.has(filePath)) {
+      deleteFile(appId, filePath);
+      logger.log(`Removed deleted file from index: ${filePath}`);
+    }
+  }
 
   // Determine which files need (re)indexing
   const toProcess: FileToProcess[] = [];

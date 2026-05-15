@@ -51,7 +51,7 @@ npx vitest run src/path/to/file.spec.ts
 npm run fmt && npm run lint && npm run ts
 ```
 
-Or use the `/dyad:lint` skill if available.
+Or use the `/lint` skill if available.
 
 > **WARNING:** Never run `npx tsc` directly — always use `npm run ts` (tsgo). Also, `tsgo` requires Node.js ≥ 24 and is installed via `npm install`, not from the npm registry.
 
@@ -114,13 +114,23 @@ Key concepts:
 - **`sleep_tool`** — used by agents that need to yield while waiting for async events.
 - **Permission bridge** — sub-agent consent requests are routed to the leader's `requireConsent` handler (shown to the user via Electron UI).
 
+### Codebase indexing (`local_agent/indexing/`)
+
+The local agent maintains a vector-search index of each app's source files for semantic code retrieval.
+
+- **`codebase_indexer.ts`** — entry point; scans files, hashes content to skip unchanged files, batches embedding calls, stores chunks via `vector_store`. Exports `indexCodebase(appId, appPath, onProgress?)` → `IndexProgress`.
+- **`chunker.ts`** — splits source files into `Chunk[]` using `SKIP_DIRS` / `EXTENSIONS` allowlists. Both are exported and re-used by `file_watcher.ts`.
+- **`vector_store.ts`** — SQLite-backed store (separate from the app DB) for file hashes and embedding chunks. Key exports: `upsertChunks`, `getFileHash`, `getIndexedFilePaths`, `deleteFile`.
+- **`embeddings.ts`** — calls the configured embedding provider and returns float vectors.
+- **`file_watcher.ts`** — wraps `fs.watch` with a 2 s debounce; calls `reindex` on relevant file changes. Lifecycle: `startWatching(appId, appPath, reindexFn)` / `stopWatching(appId)` / `stopAllWatchers()`.
+
 ### Shell session (`tools/shell_session.ts`, `tools/bash_tool.ts`)
 
 `bash_tool` executes shell commands with a **persistent cwd** across calls within a single agent turn. The cwd is stored in `shell_session.ts` (`getSessionCwd` / `setSessionCwd`) using a per-session temp file, so `cd` in one `bash_tool` call carries over to subsequent calls. On Windows it resolves Git Bash / MSYS2 bash automatically.
 
 ### React Query keys
 
-All keys defined in `src/lib/queryKeys.ts` using a centralized factory. Follow the existing pattern; `queryKeys.X.all` for base key, factory functions for parameterized keys.
+All keys defined in `src/lib/queryKeys.ts` using a centralized factory. Follow the existing pattern: `queryKeys.X.all()` (function) for the base invalidation key, factory functions for parameterized keys (e.g. `queryKeys.skills.list(appId)`). Use `queryClient.invalidateQueries({ queryKey: queryKeys.X.all() })` to invalidate an entire domain.
 
 ### Database
 
@@ -134,13 +144,23 @@ SQLite + Drizzle ORM. Schema in `src/db/schema.ts`. **Always generate migrations
 
 ### Skills system
 
-Skills are user-defined instruction templates stored as `.md` files in `<userData>/skills/` (file-based) or as DB prompts with a slug (DB-based). File-based skills override DB skills with the same slug.
+Skills are reusable instruction templates stored in two scopes:
+
+- **Global skills** — `<userData>/skills/<slug>/SKILL.md` (file-based) or DB prompts with a slug. Managed via Library UI.
+- **Project skills** — `<appPath>/.meowphyr/skills/<slug>/SKILL.md`. Scoped to a specific app; only visible when that app is active.
+
+File-based global skills override DB skills with the same slug. Project skills never override globals (distinct `project:<appName>:<slug>` key).
+
+Skill loading is app-scoped: `ipc.skill.list({ appId })` returns global + project skills for that app only. Passing no `appId` returns globals only — this is intentional so the Home page doesn't show project skills.
 
 - **Level 1** — `/slug` in chat expands to skill content before AI receives the message (`replaceSlashSkillReference`)
-- **Level 2** — Library UI to create/edit/delete skills (saved to `<userData>/skills/<slug>.md`)
+- **Level 2** — Library UI to create/edit/delete global skills
 - **Level 3** — AI sees skill metadata in system prompt and calls the `use_skill` tool to load full content on demand
+- **`/create-skill`** — builtin slash command; AI drafts and saves a new skill under `.meowphyr/skills/<slug>/SKILL.md` via the `save_skill` inline tool
 
-SKILL.md frontmatter fields: `name` (display title), `description`, `argument-hint`, `disable-model-invocation`, `user-invocable`. **Filename = slug** (not frontmatter `name`).
+SKILL.md frontmatter fields: `name` (display title), `description`, `argument-hint`, `disable-model-invocation`, `user-invocable`. **Directory name = slug** (not frontmatter `name`).
+
+`serializeSkillMd` / `parseSkillMd` in `src/lib/skillParser.ts` handle reading/writing the frontmatter format.
 
 ### Fork-specific changes
 
@@ -157,6 +177,8 @@ This is `focusthitipan/meowphyr`, a personal fork of `dyad-sh/dyad`. Key customi
 - **No `remote` module** — Electron security practice. Validate and lock mutations by `appId`.
 - **Settings writes:** `writeSettings(partial)` does a shallow top-level merge. Always spread the parent object to avoid silently dropping sibling fields. Call `readSettings()` immediately before `writeSettings()` — never across an `await` boundary.
 - **`<dyad-status>` tags** render as collapsible status indicators in chat. Valid states: `finished`, `in-progress`, `aborted`, `pending`.
+- **Builtin slash commands** (`/new`, `/compact`, `/init`, `/create-skill`) are intercepted in `ChatInput.tsx` before reaching the AI. Add new builtins there AND in `BUILTIN_SLASH_COMMANDS` in `LexicalChatInput.tsx`. Commands that need AI processing pass a dedicated flag (e.g. `triggerCreateSkill`) in `ChatStreamParams`; the handler must be placed **before** `isAskMode` / `isLocalAgentBackedMode` checks in `chat_stream_handlers.ts` to run regardless of chat mode.
+- **`<dyad-skill name="slug"/>` in user messages** renders as an inline amber badge (via `parseUserMessageParts` in `ChatMessage.tsx`). Use `displayUserPrompt` in the stream handler to set the display version while keeping the full command in `req.prompt`.
 
 ## Testing
 

@@ -1,6 +1,7 @@
 import path from "node:path";
 import fs from "node:fs";
 import { db } from "@/db";
+import { eq } from "drizzle-orm";
 import { prompts as promptsTable, apps as appsTable } from "@/db/schema";
 import { createTypedHandler } from "./base";
 import { skillContracts, type SkillDto } from "../types/skills";
@@ -129,8 +130,9 @@ async function loadProjectSkillsFromPath(appPath: string): Promise<SkillDto[]> {
   return skills;
 }
 
-async function loadProjectSkills(): Promise<SkillDto[]> {
-  const allApps = db.select({ name: appsTable.name, path: appsTable.path }).from(appsTable).all();
+async function loadProjectSkills(appId?: number): Promise<SkillDto[]> {
+  if (appId === undefined) return [];
+  const allApps = db.select({ name: appsTable.name, path: appsTable.path }).from(appsTable).where(eq(appsTable.id, appId)).all();
   const skills: SkillDto[] = [];
 
   for (const app of allApps) {
@@ -307,10 +309,10 @@ function buildSkillDto(slug: string, params: {
 }
 
 export function registerSkillHandlers() {
-  createTypedHandler(skillContracts.list, async () => {
+  createTypedHandler(skillContracts.list, async (_event, { appId }) => {
     const dbSkills = loadDbSkills();
     const fileSkills = await loadFileSkills();
-    const projectSkills = await loadProjectSkills();
+    const projectSkills = await loadProjectSkills(appId);
 
     // File skills override DB skills with the same slug (global scope)
     const bySlug = new Map<string, SkillDto>();

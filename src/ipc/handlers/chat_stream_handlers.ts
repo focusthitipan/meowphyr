@@ -30,6 +30,7 @@ import {
 } from "../../prompts/supabase_prompt";
 import { buildNeonPromptForApp } from "../../neon_admin/neon_prompt_context";
 import { getDyadAppPath } from "../../paths/paths";
+import { serializeSkillMd } from "@/lib/skillParser";
 import { buildDyadMediaUrl } from "../../lib/dyadMediaUrl";
 import type { ChatResponseEnd, ChatStreamParams } from "@/ipc/types";
 import { DyadError, DyadErrorKind } from "@/errors/dyad_error";
@@ -512,6 +513,12 @@ ${fileContent}
         }
       } catch (e) {
         logger.error("Failed to inline referenced prompts:", e);
+      }
+
+      // For /create-skill, show the command as a skill badge in the user message display
+      if (req.triggerCreateSkill !== undefined) {
+        const rest = req.prompt.replace(/^\/create-skill\s*/i, "").trim();
+        displayUserPrompt = `<dyad-skill name="create-skill"/>${rest ? " " + rest : ""}`;
       }
 
       // Expand /slug skill references (DB prompts + global file skills + project skills)
@@ -1400,6 +1407,88 @@ This conversation includes one or more image attachments. When the user uploads 
           });
           return fullResponse;
         };
+
+        // Handle /create-skill — must come before mode-specific paths so it always runs
+        if (req.triggerCreateSkill !== undefined) {
+          const description = req.triggerCreateSkill;
+
+          const saveSkillTool = {
+            description:
+              "Save the designed skill to disk. Call this exactly once after drafting.",
+            inputSchema: z.object({
+              slug: z.string().describe("Kebab-case identifier, e.g. 'code-review'"),
+              name: z.string().describe("Display title shown in the skills panel"),
+              description: z.string().optional().describe("One-line summary"),
+              argumentHint: z.string().optional().describe("Short hint, e.g. '<branch>'"),
+              content: z.string().describe("Full skill body in Markdown. Use $ARGUMENTS for the user's trailing text."),
+            }),
+            execute: async (args: {
+              slug: string;
+              name: string;
+              description?: string;
+              argumentHint?: string;
+              content: string;
+            }) => {
+              const skillDir = path.join(appPath, ".meowphyr", "skills", args.slug);
+              await fs.promises.mkdir(skillDir, { recursive: true });
+              const fileContent = serializeSkillMd({
+                name: args.name,
+                description: args.description,
+                argumentHint: args.argumentHint,
+                content: args.content,
+              });
+              await fs.promises.writeFile(path.join(skillDir, "SKILL.md"), fileContent, "utf-8");
+              return `Skill saved to .meowphyr/skills/${args.slug}/SKILL.md`;
+            },
+          };
+
+          const createSkillSystemPrompt = `You are helping the user create a new Meowphyr skill for the current project.
+
+Skills are reusable instruction templates invoked with /slug in chat. The skill content replaces the slash command in the message sent to the AI.
+
+**Skill content guidelines:**
+- Write clear, actionable Markdown instructions
+- Use $ARGUMENTS to insert the user's trailing text (e.g. "/review my PR" → $ARGUMENTS = "my PR")
+- Use $0, $1… for positional args if needed
+- Be specific — the content IS the prompt that replaces the slash command
+
+Call save_skill once with your designed skill. The skill will be saved as a project skill under .meowphyr/skills/<slug>/SKILL.md.`;
+
+          const userMsg = description
+            ? `Create a skill for: ${description}`
+            : "Create a new skill for this project";
+
+          const { fullStream } = await simpleStreamText({
+            chatMessages: [{ role: "user", content: userMsg }],
+            modelClient,
+            tools: { save_skill: saveSkillTool },
+            systemPromptOverride: createSkillSystemPrompt,
+            files: [],
+            dyadDisableFiles: true,
+          });
+
+          const result = await processStreamChunks({
+            fullStream,
+            fullResponse,
+            abortController,
+            chatId: req.chatId,
+            processResponseChunkUpdate,
+          });
+          fullResponse = result.fullResponse || "Skill created successfully.";
+
+          if (!result.fullResponse) {
+            await db
+              .update(messages)
+              .set({ content: fullResponse })
+              .where(eq(messages.id, placeholderAssistantMessage.id));
+          }
+
+          safeSend(event.sender, "chat:response:end", {
+            chatId: req.chatId,
+            updatedFiles: false,
+          } satisfies ChatResponseEnd);
+          return;
+        }
 
         // Handle ask mode: use local-agent in read-only mode
         // This gives users access to code reading tools while in ask mode

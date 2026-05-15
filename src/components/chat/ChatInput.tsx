@@ -551,6 +551,20 @@ export function ChatInput({ chatId }: { chatId?: number }) {
         posthog.capture("chat:submit", { chatMode, source: "slash-init" });
         return;
       }
+
+      if (commandName === "create-skill" && chatId) {
+        const description = trimmedInput.slice("/create-skill".length).trim();
+        setInputValue("");
+        await streamMessage({
+          prompt: trimmedInput,
+          chatId,
+          redo: false,
+          triggerCreateSkill: description || "a new skill",
+        });
+        clearAttachments();
+        posthog.capture("chat:submit", { chatMode, source: "slash-create-skill" });
+        return;
+      }
     }
 
     // Build prompt with auto-added image mentions

@@ -99,6 +99,30 @@ export function upsertChunks(
   }
 }
 
+export function getIndexedAppIds(): number[] {
+  const dir = getIndexDir();
+  if (!fs.existsSync(dir)) return [];
+  return fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith(".db"))
+    .map((f) => parseInt(f.replace(".db", ""), 10))
+    .filter((id) => !isNaN(id));
+}
+
+export function getIndexedFilePaths(appId: number): string[] {
+  try {
+    const db = openDb(appId);
+    try {
+      const rows = db.prepare("SELECT file_path FROM file_hashes").all() as { file_path: string }[];
+      return rows.map((r) => r.file_path);
+    } finally {
+      db.close();
+    }
+  } catch {
+    return [];
+  }
+}
+
 export function deleteFile(appId: number, filePath: string): void {
   const db = openDb(appId);
   try {

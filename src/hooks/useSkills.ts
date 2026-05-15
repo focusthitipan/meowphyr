@@ -5,16 +5,16 @@ import type { SkillDto, CreateSkillParams, UpdateSkillParams, DeleteSkillParams 
 
 export type { SkillDto };
 
-export function useSkills() {
+export function useSkills(appId?: number) {
   const queryClient = useQueryClient();
   const query = useQuery({
-    queryKey: queryKeys.skills.all,
-    queryFn: (): Promise<SkillDto[]> => ipc.skill.list(),
+    queryKey: queryKeys.skills.list(appId),
+    queryFn: (): Promise<SkillDto[]> => ipc.skill.list({ appId }),
     meta: { showErrorToast: true },
   });
 
   const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: queryKeys.skills.all });
+    queryClient.invalidateQueries({ queryKey: queryKeys.skills.all() });
 
   const createMutation = useMutation({
     mutationFn: (params: CreateSkillParams) => ipc.skill.create(params),

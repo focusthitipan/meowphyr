@@ -38,7 +38,7 @@ export type DeleteSkillParams = z.infer<typeof DeleteSkillParamsSchema>;
 export const skillContracts = {
   list: defineContract({
     channel: "skills:list",
-    input: z.void(),
+    input: z.object({ appId: z.number().optional() }),
     output: z.array(SkillDtoSchema),
   }),
   create: defineContract({
