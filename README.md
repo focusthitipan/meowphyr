@@ -1,48 +1,94 @@
-# Dyad (focusthitipan fork)
+# Meowphyr
 
-This is a personal fork of [dyad-sh/dyad](https://github.com/dyad-sh/dyad) with the following customizations:
+**Meowphyr** is a free, local, open-source AI app builder — a personal fork of [dyad-sh/dyad](https://github.com/dyad-sh/dyad) with Thai locale support, Windows path fixes, and customizations for local use.
 
-### UI / UX
-- Removed Dyad Pro / server-dependent UI (onboarding banner, free trial card)
-- Removed the `auto` (Dyad Pro) provider from the model picker
-- Default model changed to `gemini-2.5-flash-preview` (Google)
-- Release channel selector now correctly routes the auto-updater to stable or beta GitHub releases from this fork
-
-### Dyad Pro feature gating
-- Centralized all Dyad Pro feature checks using the `isDyadProEnabled` utility across TitleBar, ModelPicker, ChatInput, TokenBar, PreviewIframe, and IPC handlers
-- Re-enabled Pro bypass so local Pro features work without a subscription
-- Removed unused Dyad Pro model constants and cloud client code (~500 lines)
-
-### Cross-platform stability
-- Normalized path handling for Windows (drive-letter / UNC path detection, no false positives on POSIX paths containing backslash)
-- Fixed symlink edge cases during recursive copy: skip symlinked directories to prevent cycles, follow symlink-to-file entries, and handle broken symlinks gracefully
-- Stabilized Windows-specific assertions in the unit-test suite
+Built with Electron, React 19, and the Vercel AI SDK. It runs entirely on your machine; no cloud account required.
 
 ---
 
-Meowphyr is a local, open-source AI app builder. It's fast, private, and fully under your control — like Lovable, v0, or Bolt, but running right on your machine.
+## Features
 
-More info about the original project: [https://dyad.sh/](https://dyad.sh/)
+- **AI-powered app generation** — describe what you want, get a working app
+- **Multi-provider support** — OpenAI, Anthropic Claude, Google Gemini, xAI Grok, Amazon Bedrock, Azure OpenAI, and local (OpenAI-compatible) endpoints
+- **Local agent** — multi-step coding agent with tool use (bash, file read/write, semantic codebase search)
+- **Agent swarm** — spawn named sub-agents that coordinate via in-process message passing
+- **Skills system** — reusable prompt templates scoped globally or per-project
+- **MCP support** — connect external tools via the Model Context Protocol
+- **Built-in preview** — live app preview with hot reload
+- **Supabase & Vercel integration** — deploy and manage databases from within the app
+- **Thai UI locale** — full Thai language support
 
-## 🚀 Features
+---
 
-- ⚡️ **Local**: Fast, private and no lock-in.
-- 🛠 **Bring your own keys**: Use your own AI API keys — no vendor lock-in.
-- 🖥️ **Cross-platform**: Easy to run on Mac or Windows.
+## Getting Started
 
-## 📦 Download
+### Prerequisites
 
-No sign-up required. Just download and go.
+- [Node.js](https://nodejs.org/) **≥ 24**
+- npm (comes with Node.js)
 
-Releases for this fork: [https://github.com/focusthitipan/meowphyr/releases](https://github.com/focusthitipan/meowphyr/releases)
+### Install & run
 
-## 🛠️ Contributing
+```sh
+git clone https://github.com/focusthitipan/meowphyr.git
+cd meowphyr
+npm install
+npm run dev
+```
 
-**Dyad** is open-source (see License info below).
+### AI provider setup
 
-If you're interested in contributing to the upstream project, please read their [contributing](./CONTRIBUTING.md) doc.
+Open **Settings → Providers** and add an API key for at least one provider (e.g. Google Gemini, OpenAI, or Anthropic). The default model is `gemini-2.5-flash-preview`.
+
+---
+
+## Commands
+
+| Command | Description |
+|---|---|
+| `npm run dev` | Start in development mode |
+| `npm run build` | Build for E2E tests |
+| `npm run test` | Run unit tests |
+| `npm run e2e` | Run E2E tests (requires `npm run build` first) |
+| `npm run ts` | Type-check with tsgo |
+| `npm run lint` | Lint with oxlint |
+| `npm run fmt` | Format with oxfmt |
+| `npm run db:generate` | Generate Drizzle SQL migrations |
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Shell | Electron 40 |
+| UI | React 19, TailwindCSS 4, Base UI |
+| Routing | TanStack Router |
+| Data fetching | TanStack Query |
+| State | Jotai |
+| AI SDK | Vercel AI SDK |
+| Database | SQLite + Drizzle ORM |
+| Testing | Vitest, Playwright |
+
+---
+
+## Project Structure
+
+```
+src/
+  main.ts              # Electron main process
+  renderer.tsx         # React SPA entry point
+  ipc/                 # Typed IPC contracts and handlers
+  pro/                 # Local agent, swarm, skills (fair-source)
+  db/                  # Drizzle schema and migrations
+  atoms/               # Jotai global state
+  routes/              # TanStack Router pages
+```
+
+---
 
 ## License
 
-- All the code in this repo outside of `src/pro` is open-source and licensed under Apache 2.0 - see [LICENSE](./LICENSE).
-- All the code in this repo within `src/pro` is fair-source and licensed under [Functional Source License 1.1 Apache 2.0](https://fsl.software/) - see [LICENSE](./src/pro/LICENSE).
+MIT — see [LICENSE](LICENSE) for details.
+
+Portions under fair-source license — see `src/pro/` directory.
