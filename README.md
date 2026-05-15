@@ -20,7 +20,6 @@ Built with Electron, React 19, and the Vercel AI SDK. It runs entirely on your m
 | **Provider UI** | Provider/model picker; image-gen settings; Pro-gated UI removed |
 | **Pro bypass** | All local Pro features enabled without a subscription |
 | **Windows** | Normalized path handling; symlink edge-case fixes; stable Windows tests |
-| **Default model** | `gemini-2.5-flash-preview` (Google) |
 
 ---
 
