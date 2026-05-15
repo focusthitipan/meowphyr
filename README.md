@@ -79,7 +79,7 @@ npm run dev
 
 ### AI provider setup
 
-Open **Settings → Providers** and add an API key for at least one provider (e.g. Google Gemini, OpenAI, or Anthropic). The default model is `gemini-2.5-flash-preview`.
+Open **Settings → Providers** and add an API key for at least one provider (e.g. Google Gemini, OpenAI, or Anthropic).
 
 ---
 
